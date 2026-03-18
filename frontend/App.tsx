@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+
 import { ShoppingCart, Barcode, HeartPulse } from "lucide-react";
 
 function App() {
@@ -8,8 +8,8 @@ function App() {
   async function processScan(e: React.FormEvent) {
     e.preventDefault();
     if (!barcode) return;
-    // We will later invoke the Turso/SQLite rust command here
-    // await invoke("process_sale_item", { barcode });
+    // We will later invoke the Electron/SQLite command here
+    // await window.ipcRenderer.invoke("process_sale_item", { barcode });
     console.log("Scanned:", barcode);
     setBarcode("");
   }
