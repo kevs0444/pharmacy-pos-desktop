@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -17,17 +17,25 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+// Remove default OS menu to match the clean web app look
+Menu.setApplicationMenu(null)
+
 function createWindow() {
   win = new BrowserWindow({
-    width: 1024,
-    height: 768,
+    width: 1200,
+    height: 800,
     title: 'Pharmacy POS',
+    icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.ico'),
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   })
+
+  // Prevent menubar from appearing even if ALT is pressed.
+  win.setMenuBarVisibility(false)
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)

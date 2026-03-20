@@ -27,30 +27,36 @@ We have shifted the architecture to **Electron** per the client's decision for e
 * **Remote Database (Online):** Turso Cloud Database.
 * **Sync Strategy (Automatic):** The local SQLite embedded replica lives inside Electron and automatically synchronizes with the remote Turso Database whenever the computer detects an active internet connection.
 
-## 3. Software Development Life Cycle (SDLC)
+## 3. Software Development Life Cycle (SDLC) & ROADMAP
 
-### Phase 1: Requirements Gathering & Wireframing
-- Get a sample product list from the client.
-- Define the SQL schema (Tables: `Products`, `Categories`, `Sales`, `Sale_Items`, `Users`).
+### PHASE 1: Client Demo UI (Current Focus - Fortifying Frontend)
+*Goal: Provide a fully clickable, high-fidelity prototype to the client so they can visualize the workflow before we connect the database.*
 
-### Phase 3: Frontend & Theme (Current Focus)
-- Create a modern, minimalist dashboard focused on the "BotikaPlus" theme (Vibrant Green and Deep Blue).
-- Build a generic UI components folder (`frontend/components/ui`) for pop-outs (dialogs), buttons, cards, and charts.
-- Implement the dashboard view (Sidebar, Welcome Card, Stock Condition Charts, Product Status, and Calendar).
+1. **Login System:** Implement a beautiful, branded login screen featuring the "BotikaPlus" logo and styling.
+2. **Dashboard Overview:** Comprehensive reporting UI (Charts, Stock levels, Calendar).
+3. **Inventory & Sales Previews:** Data tables showing sample realistic products with image links from the internet.
+4. **Point of Sale (POS) Interface:** The core selling screen. A grid of products with images, a calculation cart, and checkout capability (UI only).
 
-### Phase 4: Core Offline Features (MVP - Minimum Viable Product)
-- Integrate the UI with the POS terminal inside `frontend/`.
-- Implement barcode scanning capabilities.
-- Implement cart calculation, applying discounts, and checking out.
-- Execute SQL transactions locally in Electron's Main thread via `ipcRenderer.invoke`.
+### PHASE 2: Database & Offline Architecture
+*Goal: Bring the static UI to life by hooking it up to Turso and Local SQLite.*
 
-### Phase 4: Sync & Authentication
-- Setup authentication (e.g., Clerk) for Cashier vs Admin roles.
-- Ensure the local SQLite system seamlessly syncs off-grid transactions up to Turso when internet returns.
+1. Define the SQL schema (Tables: `Products`, `Categories`, `Sales`, `Sale_Items`, `Users`).
+2. Execute SQL transactions locally in Electron's Main thread via `ipcRenderer.invoke`.
+3. Implement cart calculation, applying discounts, and checking out natively.
+4. Build the Background Sync mechanism to push local offline transactions to the remote Turso Cloud Database when internet is available.
 
-### Phase 5: Testing & Deployment
-- Test internet dropping mid-transaction to ensure local DB handles it perfectly.
-- **Deployment:** Use `electron-builder` to automatically compile an `.exe` installer. Electron has built-in Auto-Updaters so you can push bug fixes remotely.
+### PHASE 3: Role-based Authentication & Security
+*Goal: Restrict actions based on user tier.*
+
+1. Implement Cashier vs. Admin role validation logic in the Electron backend.
+2. Hide/Show specific Dashboard widgets and Inventory editing features based on the logged-in user role.
+3. Secure the IPC bridge so that only Admins can trigger destructive/editing SQL queries.
+
+### PHASE 4: Testing & Deployment
+*Goal: Deliver the `.exe` to the client.*
+
+1. Test internet dropping mid-transaction to ensure local DB handles it perfectly.
+2. Use `electron-builder` to automatically compile an `.exe` installer. Electron has built-in Auto-Updaters so you can push bug fixes remotely.
 
 ## 4. How to Maximize AI in this Project
 When passing this workflow to AI tools, follow these structured prompts:

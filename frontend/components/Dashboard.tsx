@@ -8,19 +8,19 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Profile Card */}
-        <Card className="md:col-span-2 bg-gradient-to-r from-brand-teal/10 to-transparent border-brand-teal/20 shadow-sm relative overflow-hidden">
+        <Card className="md:col-span-2 bg-gradient-to-r from-brand-blue/10 to-transparent border-brand-blue/20 shadow-sm relative overflow-hidden">
           <CardContent className="p-8 flex items-center justify-between">
             <div className="space-y-4">
               <h1 className="text-4xl font-extrabold text-slate-800 tracking-tight">Dashboard</h1>
               <div className="text-lg font-medium text-slate-600">
                 <p>Hello, staff</p>
-                <p className="font-bold text-brand-teal">Welcome!</p>
+                <p className="font-bold text-brand-blue">Welcome!</p>
               </div>
             </div>
             {/* SVG Illustration Placeholder instead of image/emoji */}
             <div className="absolute right-0 bottom-0 opacity-80 mix-blend-multiply w-48 h-48 pointer-events-none">
               <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#0D9488" d="M45.7,-76.1C58.9,-69.3,69.1,-55.3,77.3,-40.5C85.5,-25.7,91.7,-10.1,89.5,4.3C87.3,18.7,76.6,31.9,65.8,43.4C55,54.9,44.1,64.7,30.9,71.2C17.7,77.7,2.2,80.9,-12.3,79.5C-26.8,78.1,-40.3,72.1,-52.3,63.1C-64.3,54.1,-74.8,42.1,-80.7,27.8C-86.6,13.5,-87.9,-3.1,-82.9,-17.7C-77.9,-32.3,-66.6,-44.9,-53.4,-53.1C-40.2,-61.3,-25.1,-65.1,-9.6,-66.9C5.9,-68.7,21.8,-68.5,32.4,-83L45.7,-76.1Z" transform="translate(100 100) scale(1.1)" />
+                <path fill="#203468" d="M45.7,-76.1C58.9,-69.3,69.1,-55.3,77.3,-40.5C85.5,-25.7,91.7,-10.1,89.5,4.3C87.3,18.7,76.6,31.9,65.8,43.4C55,54.9,44.1,64.7,30.9,71.2C17.7,77.7,2.2,80.9,-12.3,79.5C-26.8,78.1,-40.3,72.1,-52.3,63.1C-64.3,54.1,-74.8,42.1,-80.7,27.8C-86.6,13.5,-87.9,-3.1,-82.9,-17.7C-77.9,-32.3,-66.6,-44.9,-53.4,-53.1C-40.2,-61.3,-25.1,-65.1,-9.6,-66.9C5.9,-68.7,21.8,-68.5,32.4,-83L45.7,-76.1Z" transform="translate(100 100) scale(1.1)" />
               </svg>
             </div>
           </CardContent>
