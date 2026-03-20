@@ -24,14 +24,14 @@ function App() {
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <Navbar onLogout={() => setUserRole(null)} onNavigate={setActiveTab} userRole={userRole} />
         {activeTab === "POS Terminal" && <POS />}
-        {activeTab === "Dashboard" && <Dashboard />}
+        {activeTab === "Dashboard" && <Dashboard userRole={userRole} />}
         {activeTab === "Admin Panel" && <Admin />}
         {activeTab === "Profile" && <Profile />}
         {activeTab === "Inventory" && <Inventory />}
         {activeTab === "Sales" && <Sales />}
         {activeTab === "Orders" && <Orders />}
         {/* Reporting routes can map back to sales or dashboard for now */}
-        {activeTab === "Reporting" && <Dashboard />}
+        {activeTab === "Reporting" && <Dashboard userRole={userRole} />}
       </div>
     </div>
   );

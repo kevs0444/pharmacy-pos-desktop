@@ -25,7 +25,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     title: 'Pharmacy POS',
-    icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.ico'),
+    icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
