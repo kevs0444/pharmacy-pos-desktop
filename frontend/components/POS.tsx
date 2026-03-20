@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, LayoutGrid, List } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, LayoutGrid, List, Pill } from "lucide-react";
 import { cn } from "../lib/utils";
 
-// Sample robust dummy products with specific, high-quality Unsplash IDs perfectly matched to Pharmacy
+// Sample robust dummy products - no images per client decision to keep DB lightweight
 const DUMMY_PRODUCTS = [
-  { id: '1', name: 'Amoxicillin 500mg', category: 'Antibiotic', price: 12.50, stock: 150, image: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=400&q=80' },
-  { id: '2', name: 'Vitamin C Complex', category: 'Vitamins', price: 8.99, stock: 45, image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80' },
-  { id: '3', name: 'Paracetamol 500mg', category: 'Pain Relief', price: 4.50, stock: 320, image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=400&q=80' },
-  { id: '4', name: 'Ibuprofen 400mg', category: 'Pain Relief', price: 6.20, stock: 80, image: 'https://images.unsplash.com/photo-1628771065518-0d82f1938462?w=400&q=80' },
-  { id: '5', name: 'First Aid Kit', category: 'Supplies', price: 24.99, stock: 12, image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=400&q=80' },
-  { id: '6', name: 'Cough Syrup', category: 'Cold & Flu', price: 11.25, stock: 0, image: 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=400&q=80' },
-  { id: '7', name: 'Bandages Pack', category: 'Outer Care', price: 3.49, stock: 200, image: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=400&q=80' },
-  { id: '8', name: 'Eye Drops', category: 'Eye Care', price: 9.99, stock: 34, image: 'https://images.unsplash.com/photo-1512069772995-ec65ed45afd6?w=400&q=80' },
+  { id: '1', name: 'Amoxicillin 500mg', category: 'Antibiotic', price: 12.50, stock: 150 },
+  { id: '2', name: 'Vitamin C Complex', category: 'Vitamins', price: 8.99, stock: 45 },
+  { id: '3', name: 'Paracetamol 500mg', category: 'Pain Relief', price: 4.50, stock: 320 },
+  { id: '4', name: 'Ibuprofen 400mg', category: 'Pain Relief', price: 6.20, stock: 80 },
+  { id: '5', name: 'First Aid Kit', category: 'Supplies', price: 24.99, stock: 12 },
+  { id: '6', name: 'Cough Syrup', category: 'Cold & Flu', price: 11.25, stock: 0 },
+  { id: '7', name: 'Bandages Pack', category: 'Outer Care', price: 3.49, stock: 200 },
+  { id: '8', name: 'Eye Drops', category: 'Eye Care', price: 9.99, stock: 34 },
 ];
 
 export function POS() {
@@ -344,15 +344,20 @@ export function POS() {
                 product.stock === 0 && "opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm"
               )}
             >
-              {/* Image */}
-              <div className={cn("bg-slate-100 overflow-hidden relative shrink-0", viewMode === "grid" ? "h-28 md:h-32" : "w-16 h-16 rounded-xl")}>
-                 <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
-                 {product.stock === 0 && (
-                   <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                     <span className={cn("text-white font-black uppercase tracking-wider bg-red-500 rounded-full", viewMode === "grid" ? "text-xs px-3 py-1" : "text-[8px] px-1.5 py-0.5")}>Out</span>
-                   </div>
-                 )}
-              </div>
+              {/* Icon Badge instead of Image */}
+              {viewMode === "grid" && (
+                <div className={cn("h-20 flex items-center justify-center relative shrink-0", product.stock === 0 ? "bg-slate-200" : "bg-gradient-to-br from-brand-blue/10 to-brand-green/10")}>
+                  <Pill className={cn("w-8 h-8", product.stock === 0 ? "text-slate-400" : "text-brand-blue/40")} />
+                  {product.stock === 0 && (
+                    <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center">
+                      <span className="text-white text-xs font-black uppercase tracking-wider bg-red-500 px-3 py-1 rounded-full">Out of Stock</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {viewMode === "list" && product.stock === 0 && (
+                <span className="text-[8px] font-black uppercase bg-red-500 text-white px-1.5 py-0.5 rounded-full shrink-0">Out</span>
+              )}
 
               {/* Info */}
               <div className={cn("flex flex-1", viewMode === "grid" ? "flex-col p-3 md:p-4" : "flex-row items-center justify-between py-1 pr-2")}>
@@ -418,8 +423,8 @@ export function POS() {
           ) : (
             cart.map(item => (
               <div key={item.product.id} className="flex gap-3 bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
-                <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                  <img src={item.product.image} className="w-full h-full object-cover" />
+                <div className="w-12 h-12 rounded-lg bg-brand-blue/10 flex items-center justify-center shrink-0">
+                  <Pill className="w-5 h-5 text-brand-blue/50" />
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
                    <div className="flex justify-between items-start">
