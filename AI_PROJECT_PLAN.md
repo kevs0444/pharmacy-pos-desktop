@@ -33,12 +33,13 @@ We have shifted the architecture to **Electron** per the client's decision for e
 - Get a sample product list from the client.
 - Define the SQL schema (Tables: `Products`, `Categories`, `Sales`, `Sale_Items`, `Users`).
 
-### Phase 2: System Architecture & Setup (Current)
-- Initialize the Electron + Vite + React project.
-- Connect the Electron Main process to the React Renderer via ContextBridge.
+### Phase 3: Frontend & Theme (Current Focus)
+- Create a modern, minimalist dashboard focused on the "BotikaPlus" theme (Vibrant Green and Deep Blue).
+- Build a generic UI components folder (`frontend/components/ui`) for pop-outs (dialogs), buttons, cards, and charts.
+- Implement the dashboard view (Sidebar, Welcome Card, Stock Condition Charts, Product Status, and Calendar).
 
-### Phase 3: Core Offline Features (MVP - Minimum Viable Product)
-- Build the UI for the POS terminal inside `frontend/`.
+### Phase 4: Core Offline Features (MVP - Minimum Viable Product)
+- Integrate the UI with the POS terminal inside `frontend/`.
 - Implement barcode scanning capabilities.
 - Implement cart calculation, applying discounts, and checking out.
 - Execute SQL transactions locally in Electron's Main thread via `ipcRenderer.invoke`.
