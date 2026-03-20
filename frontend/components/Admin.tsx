@@ -8,10 +8,14 @@ import {
   Building2,
   Clock,
   Search,
-  User,
   ArrowLeft,
   UserMinus,
-  Settings
+  Settings,
+  X,
+  Save,
+  Mail,
+  Phone,
+  MapPin
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -25,9 +29,41 @@ const mockAccounts = [
   { name: "Erick", email: "erick@gmail.com", role: "STAFF", status: "Active", seed: "erick" },
 ];
 
+const INITIAL_MANUFACTURERS = [
+  'Unilever', 'Pfizer', 'TGP Generics', 'Bayer', 'GSK', 'Unilab'
+];
+
 export function Admin() {
   const [viewState, setViewState] = useState<"dashboard" | "accounts">("dashboard");
+  const [isManufacturerModalOpen, setIsManufacturerModalOpen] = useState(false);
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [manufacturers, setManufacturers] = useState(INITIAL_MANUFACTURERS);
+  const [accounts, setAccounts] = useState(mockAccounts);
 
+  // Manufacturer form
+  const [mfForm, setMfForm] = useState({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
+  // Employee form
+  const [empForm, setEmpForm] = useState({ name: '', email: '', role: 'STAFF', password: '' });
+
+  const handleSaveManufacturer = () => {
+    if (!mfForm.name) return;
+    setManufacturers(prev => [...prev, mfForm.name]);
+    setIsManufacturerModalOpen(false);
+    setMfForm({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
+  };
+
+  const handleSaveEmployee = () => {
+    if (!empForm.name || !empForm.email) return;
+    setAccounts(prev => [{
+      name: empForm.name,
+      email: empForm.email,
+      role: empForm.role,
+      status: 'Active',
+      seed: empForm.name.toLowerCase().replace(/\s/g, '')
+    }, ...prev]);
+    setIsEmployeeModalOpen(false);
+    setEmpForm({ name: '', email: '', role: 'STAFF', password: '' });
+  };
   if (viewState === "accounts") {
      return (
         <div className="h-full w-full flex flex-col bg-slate-50/50 overflow-hidden font-sans">
@@ -70,7 +106,7 @@ export function Admin() {
            {/* Modern Card Grid */}
            <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-[1400px] mx-auto animate-in slide-in-from-bottom-4 fade-in duration-500">
-                 {mockAccounts.map((acc, i) => (
+                 {accounts.map((acc, i) => (
                     <div key={i} className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-brand-blue/30 transition-all duration-300 group flex flex-col relative overflow-hidden">
                        
                        {/* Abstract Background Decoration */}
@@ -146,12 +182,12 @@ export function Admin() {
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Admin Dashboard</h1>
             <p className="text-sm font-medium text-slate-500 mt-1">Hello admin, welcome to the system overview.</p>
           </div>
-          <div className="flex flex-wrap gap-3 shrink-0">
-             <button className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-sm active:scale-95 text-sm md:text-base">
+         <div className="flex flex-wrap gap-3 shrink-0">
+             <button onClick={() => setIsManufacturerModalOpen(true)} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-sm active:scale-95 text-sm md:text-base">
                 <Building2 className="w-4 h-4" />
                 Add Manufacturer
              </button>
-             <button className="flex items-center gap-2 bg-brand-blue hover:bg-blue-900 text-white font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-md shadow-brand-blue/20 active:scale-95 text-sm md:text-base">
+             <button onClick={() => setIsEmployeeModalOpen(true)} className="flex items-center gap-2 bg-brand-blue hover:bg-blue-900 text-white font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-md shadow-brand-blue/20 active:scale-95 text-sm md:text-base">
                 <UserPlus className="w-4 h-4" />
                 New Employee
              </button>
@@ -303,7 +339,7 @@ export function Admin() {
                     </h2>
                  </div>
                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                    {['Unilever', 'Pfizer', 'TGP Generics', 'Bayer', 'GSK', 'Unilab'].map((brand, i) => (
+                    {manufacturers.map((brand, i) => (
                        <div key={i} className="h-14 rounded-xl border-2 border-slate-100 flex items-center justify-center px-3 hover:border-brand-light hover:bg-brand-light/20 cursor-pointer text-slate-500 hover:text-brand-blue transition-all active:scale-95 shadow-sm">
                           <span className="text-xs font-extrabold text-center truncate w-full tracking-wide uppercase">{brand}</span>
                        </div>
@@ -315,6 +351,119 @@ export function Admin() {
         </div>
 
       </div>
+
+      {/* ADD MANUFACTURER MODAL */}
+      {isManufacturerModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom-4">
+            <div className="bg-brand-blue p-6 flex justify-between items-center text-white">
+              <div>
+                <h2 className="text-xl font-bold">Add New Manufacturer</h2>
+                <p className="text-sm opacity-80 mt-1">Register a supplier or drug manufacturer.</p>
+              </div>
+              <button onClick={() => setIsManufacturerModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Company Name *</label>
+                  <input type="text" value={mfForm.name} onChange={e => setMfForm({...mfForm, name: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="e.g. Unilab Pharmaceuticals" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Person</label>
+                  <input type="text" value={mfForm.contact} onChange={e => setMfForm({...mfForm, contact: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="e.g. Juan Dela Cruz" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
+                  <div className="relative">
+                    <input type="email" value={mfForm.email} onChange={e => setMfForm({...mfForm, email: e.target.value})} className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="supplier@company.com" />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone Number</label>
+                  <div className="relative">
+                    <input type="tel" value={mfForm.phone} onChange={e => setMfForm({...mfForm, phone: e.target.value})} className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="+63 912 345 6789" />
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Category</label>
+                  <select value={mfForm.category} onChange={e => setMfForm({...mfForm, category: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all">
+                    <option value="Pharmaceutical">Pharmaceutical</option>
+                    <option value="Medical Supplies">Medical Supplies</option>
+                    <option value="Personal Care">Personal Care</option>
+                    <option value="Vitamins">Vitamins & Supplements</option>
+                    <option value="Baby & Mom">Baby & Mom</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Address</label>
+                  <div className="relative">
+                    <input type="text" value={mfForm.address} onChange={e => setMfForm({...mfForm, address: e.target.value})} className="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="Makati City, Metro Manila" />
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100">
+              <button onClick={() => setIsManufacturerModalOpen(false)} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
+              <button onClick={handleSaveManufacturer} className="px-8 py-3 bg-brand-green hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-brand-green/20 transition-all flex items-center gap-2 active:scale-95">
+                <Save className="w-5 h-5" /> Save Manufacturer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD EMPLOYEE MODAL */}
+      {isEmployeeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in slide-in-from-bottom-4">
+            <div className="bg-slate-800 p-6 flex justify-between items-center text-white">
+              <div>
+                <h2 className="text-xl font-bold">Add New Employee</h2>
+                <p className="text-sm opacity-80 mt-1">Create a new user account for the system.</p>
+              </div>
+              <button onClick={() => setIsEmployeeModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-8 space-y-5">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Full Name *</label>
+                <input type="text" value={empForm.name} onChange={e => setEmpForm({...empForm, name: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="e.g. Maria Santos" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Address *</label>
+                <input type="email" value={empForm.email} onChange={e => setEmpForm({...empForm, email: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="employee@botikaplus.com" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Role</label>
+                  <select value={empForm.role} onChange={e => setEmpForm({...empForm, role: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all">
+                    <option value="STAFF">Staff</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Initial Password</label>
+                  <input type="password" value={empForm.password} onChange={e => setEmpForm({...empForm, password: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="••••••••" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100">
+              <button onClick={() => setIsEmployeeModalOpen(false)} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
+              <button onClick={handleSaveEmployee} className="px-8 py-3 bg-brand-blue hover:bg-blue-900 text-white font-bold rounded-xl shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95">
+                <Save className="w-5 h-5" /> Add Employee
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

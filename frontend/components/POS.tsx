@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, LayoutGrid, List } from "lucide-react";
 import { cn } from "../lib/utils";
 
 // Sample robust dummy products with specific, high-quality Unsplash IDs perfectly matched to Pharmacy
@@ -18,6 +18,7 @@ export function POS() {
   const [cart, setCart] = useState<{product: typeof DUMMY_PRODUCTS[0], qty: number}[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const addToCart = (product: typeof DUMMY_PRODUCTS[0]) => {
     setCart(prev => {
@@ -276,10 +277,10 @@ export function POS() {
 
       {/* Main POS Interface */}
       {/* Products Grid (Left Area) */}
-      <div className="flex-1 flex flex-col p-6 overflow-hidden">
-        <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+        <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800">Point of Sale</h1>
+            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800">Point of Sale</h1>
             <p className="text-sm text-slate-500 font-medium">Select items to add to current transaction.</p>
           </div>
           <div className="relative w-full md:w-80">
@@ -296,42 +297,93 @@ export function POS() {
         </div>
 
         {/* Categories List */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 custom-scrollbar">
-          {categories.map(cat => (
-             <button
-               key={cat}
-               onClick={() => setSelectedCategory(cat)}
-               className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors",
-                  selectedCategory === cat 
-                    ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20" 
-                    : "bg-white text-slate-500 hover:bg-slate-100 hover:text-brand-blue border border-slate-200"
-               )}
-             >
-               {cat}
-             </button>
-          ))}
+        <div className="flex justify-between items-center mb-6 gap-4">
+          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar flex-1">
+            {categories.map(cat => (
+               <button
+                 key={cat}
+                 onClick={() => setSelectedCategory(cat)}
+                 className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors",
+                    selectedCategory === cat 
+                      ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20" 
+                      : "bg-white text-slate-500 hover:bg-slate-100 hover:text-brand-blue border border-slate-200"
+                 )}
+               >
+                 {cat}
+               </button>
+            ))}
+          </div>
+
+          <div className="hidden md:flex bg-slate-100 p-1 rounded-xl shrink-0 h-[42px] mb-2 self-start border border-slate-200">
+            <button 
+               onClick={() => setViewMode("grid")}
+               className={cn("px-3 rounded-lg flex items-center justify-center transition-all", viewMode === "grid" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
+               title="Card View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button 
+               onClick={() => setViewMode("list")}
+               className={cn("px-3 rounded-lg flex items-center justify-center transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
+               title="List View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 pb-10 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 custom-scrollbar content-start">
+        <div className={cn("flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar content-start", viewMode === "grid" ? "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4" : "flex flex-col gap-3")}>
           {filteredProducts.map(product => (
             <div 
               key={product.id} 
-              onClick={() => addToCart(product)}
-              className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-brand-blue/30 transition-all group duration-300 active:scale-95 flex flex-col h-64"
+              onClick={() => product.stock > 0 && addToCart(product)}
+              className={cn(
+                "bg-white rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all group duration-300 active:scale-95 flex overflow-hidden",
+                viewMode === "grid" ? "flex-col" : "flex-row items-center p-3 gap-4",
+                product.stock === 0 && "opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm"
+              )}
             >
-              <div className="h-32 rounded-xl bg-slate-100 mb-4 overflow-hidden relative border border-slate-100/50 shrink-0">
+              {/* Image */}
+              <div className={cn("bg-slate-100 overflow-hidden relative shrink-0", viewMode === "grid" ? "h-28 md:h-32" : "w-16 h-16 rounded-xl")}>
                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
-                 <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm text-xs font-black px-2.5 py-1 rounded-full text-brand-blue shadow-sm">
-                    ₱{product.price.toFixed(2)}
-                 </div>
+                 {product.stock === 0 && (
+                   <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+                     <span className={cn("text-white font-black uppercase tracking-wider bg-red-500 rounded-full", viewMode === "grid" ? "text-xs px-3 py-1" : "text-[8px] px-1.5 py-0.5")}>Out</span>
+                   </div>
+                 )}
               </div>
-              <h3 className="font-bold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors flex-1 line-clamp-2">{product.name}</h3>
-              <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-50 shrink-0">
-                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{product.category}</p>
-                 <button className="bg-brand-light/50 text-brand-blue p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Plus className="w-3 h-3" />
-                 </button>
+
+              {/* Info */}
+              <div className={cn("flex flex-1", viewMode === "grid" ? "flex-col p-3 md:p-4" : "flex-row items-center justify-between py-1 pr-2")}>
+                
+                <div className={cn(viewMode === "grid" ? "" : "flex flex-col justify-center")}>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{product.category}</p>
+                  <h3 className="font-extrabold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors line-clamp-2">{product.name}</h3>
+                </div>
+                
+                <div className={cn("mt-auto flex", viewMode === "grid" ? "pt-3 items-end justify-between" : "items-center gap-6 md:gap-12")}>
+                  <div>
+                    <p className={cn("font-bold text-slate-400 uppercase", viewMode === "grid" ? "text-[10px]" : "hidden")}>Price</p>
+                    <p className={cn("font-black text-brand-blue leading-none", viewMode === "grid" ? "text-lg" : "text-base")}>₱{product.price.toFixed(2)}</p>
+                  </div>
+                  <div className={cn("text-right", viewMode === "list" && "w-16")}>
+                    <p className={cn("font-bold text-slate-400 uppercase", viewMode === "grid" ? "text-[10px]" : "hidden")}>Stock</p>
+                    <p className={cn("font-black leading-none whitespace-nowrap", viewMode === "grid" ? "text-sm" : "text-xs", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>{product.stock} left</p>
+                  </div>
+                  
+                  {viewMode === "list" && (
+                    <button className="py-2 px-4 bg-brand-green/10 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider shrink-0 pointer-events-none">
+                      Add
+                    </button>
+                  )}
+                </div>
+
+                {viewMode === "grid" && (
+                  <button className="mt-3 w-full py-2 bg-brand-green/10 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider pointer-events-none">
+                    Add to Cart
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -345,8 +397,8 @@ export function POS() {
       </div>
 
       {/* Cart Panel (Right Area) */}
-      <div className="w-96 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg z-10">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+      <div className="w-72 md:w-80 lg:w-96 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg z-10 shrink-0">
+        <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
              <div className="bg-brand-blue p-2 rounded-full text-white">
                 <ShoppingCart className="w-5 h-5" />

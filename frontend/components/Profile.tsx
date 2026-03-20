@@ -5,10 +5,10 @@ export function Profile() {
   const [isEditing, setIsEditing] = useState(false);
 
   return (
-    <div className="h-full w-full bg-slate-50 p-6 overflow-y-auto">
+    <div className="h-full w-full bg-slate-50 p-4 md:p-6 lg:p-8 overflow-y-auto custom-scrollbar">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Profile Information</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Profile Information</h1>
           <p className="text-slate-500 text-sm font-medium mt-1">Manage your personal details and account preferences.</p>
         </div>
 
@@ -25,11 +25,11 @@ export function Profile() {
              </div>
           </div>
 
-          <div className="px-8 pb-12 flex flex-col md:flex-row gap-12 relative z-10 -mt-20">
+          <div className="px-4 sm:px-6 md:px-8 pb-8 md:pb-12 flex flex-col md:flex-row gap-8 md:gap-12 relative z-10 -mt-16 md:-mt-20">
             
             {/* Left Column - Avatar & Picture */}
             <div className="flex flex-col items-center shrink-0">
-               <div className="w-48 h-48 bg-slate-100 rounded-full border-4 border-white shadow-lg overflow-hidden relative group">
+               <div className="w-32 h-32 md:w-48 md:h-48 bg-slate-100 rounded-full border-4 border-white shadow-lg overflow-hidden relative group mx-auto md:mx-0">
                   {/* Stand-in for 3D character or portrait */}
                   <img src="https://ui-avatars.com/api/?name=Manager&background=203468&color=fff&size=200" alt="Avatar" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
@@ -42,9 +42,9 @@ export function Profile() {
             </div>
 
             {/* Right Column - Form Data */}
-            <div className="flex-1 pt-24 md:pt-4">
-               <div className="flex items-center justify-between mb-8">
-                 <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Profile Info</h2>
+            <div className="flex-1 pt-6 md:pt-4">
+               <div className="flex items-center justify-between mb-6 md:mb-8">
+                 <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Profile Info</h2>
                  <button 
                    onClick={() => setIsEditing(!isEditing)}
                    className="flex items-center gap-2 text-sm font-bold text-brand-blue hover:text-brand-green transition-colors"

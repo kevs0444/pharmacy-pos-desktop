@@ -59,12 +59,12 @@ export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
   };
 
   return (
-    <header className="h-16 flex items-center justify-between px-8 bg-white/50 backdrop-blur-sm border-b border-slate-200/50 sticky top-0 z-20 w-full relative">
-      <div className="text-sm font-medium tracking-wide text-slate-600">
+    <header className="h-14 md:h-16 flex items-center justify-between px-4 md:px-8 bg-white/50 backdrop-blur-sm border-b border-slate-200/50 sticky top-0 z-20 w-full relative">
+      <div className="text-xs md:text-sm font-medium tracking-wide text-slate-600 hidden sm:block">
         {currentDate}
       </div>
       
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 md:gap-6 ml-auto">
         
         {/* User Dropdown Container */}
         <div className="relative" ref={dropdownRef}>

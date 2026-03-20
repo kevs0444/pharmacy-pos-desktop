@@ -51,7 +51,7 @@ export function Inventory() {
   };
 
   return (
-    <div className="flex-1 p-8 space-y-6 bg-slate-50 overflow-y-auto relative h-full">
+    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 bg-slate-50 overflow-y-auto relative h-full custom-scrollbar">
       
       {/* Add Item Modal Overlay */}
       {isModalOpen && (
@@ -122,34 +122,34 @@ export function Inventory() {
         </div>
       )}
 
-      <div className="flex justify-between items-center relative z-10">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 relative z-10">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Inventory Management</h1>
-          <p className="text-slate-500 font-medium">Manage and view your pharmacy stock catalog</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Inventory Management</h1>
+          <p className="text-sm text-slate-500 font-medium">Manage and view your pharmacy stock catalog</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-brand-blue hover:bg-blue-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95"
+          className="bg-brand-blue hover:bg-blue-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95 self-start sm:self-auto text-sm md:text-base"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4 md:w-5 md:h-5" />
           Add Item
         </button>
       </div>
 
-      <Card className="border-t-4 border-t-brand-teal relative z-10">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 gap-4">
-          <CardTitle className="text-xl font-bold text-slate-800">Product List</CardTitle>
-          <div className="relative w-full sm:w-80">
+      <Card className="border-t-4 border-t-brand-teal relative z-10 overflow-hidden">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 md:pb-6 gap-3 md:gap-4">
+          <CardTitle className="text-lg md:text-xl font-bold text-slate-800">Product List</CardTitle>
+          <div className="relative w-full sm:w-64 md:w-80">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
               placeholder="Search by name, generic, or SKU..." 
-              className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-sm font-medium transition-all"
+              className="w-full pl-9 pr-3 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-sm font-medium transition-all"
             />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="relative w-full overflow-hidden border border-slate-200 rounded-xl bg-white shadow-sm">
+        <CardContent className="p-3 md:p-6">
+          <div className="relative w-full overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-black tracking-wider">
                 <tr>

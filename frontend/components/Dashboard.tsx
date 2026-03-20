@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   Download, AlertCircle, Clock, 
   TrendingUp, Users, PackageOpen, ShoppingBag, ArrowUpRight, DollarSign, Target, PieChart, TrendingDown
@@ -5,6 +6,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { cn } from "../lib/utils";
+import { TimeframeSelector } from "./ui/TimeframeSelector";
 
 interface DashboardProps {
   userRole: "Admin" | "Manager" | "Staff";
@@ -12,6 +14,63 @@ interface DashboardProps {
 
 export function Dashboard({ userRole }: DashboardProps) {
   
+  // Timeframe states for each chart
+  const [staffBarTF, setStaffBarTF] = useState<string>('Daily');
+  const [staffPieTF, setStaffPieTF] = useState<string>('Daily');
+
+  // Dynamic bar chart data per timeframe
+  const staffBarData: Record<string, { time: string; value: number; color: string }[]> = {
+    Daily: [
+      { time: '8 AM', value: 30, color: 'bg-blue-500' },
+      { time: '9 AM', value: 55, color: 'bg-blue-600' },
+      { time: '10 AM', value: 85, color: 'bg-emerald-500' },
+      { time: '11 AM', value: 45, color: 'bg-blue-400' },
+      { time: '12 PM', value: 95, color: 'bg-emerald-600' },
+      { time: '1 PM', value: 65, color: 'bg-blue-600' },
+      { time: '2 PM', value: 10, color: 'bg-slate-300' },
+    ],
+    Weekly: [
+      { time: 'Mon', value: 72, color: 'bg-blue-500' },
+      { time: 'Tue', value: 58, color: 'bg-blue-400' },
+      { time: 'Wed', value: 91, color: 'bg-emerald-500' },
+      { time: 'Thu', value: 65, color: 'bg-blue-600' },
+      { time: 'Fri', value: 88, color: 'bg-emerald-600' },
+      { time: 'Sat', value: 45, color: 'bg-blue-400' },
+      { time: 'Sun', value: 20, color: 'bg-slate-300' },
+    ],
+    Monthly: [
+      { time: 'Wk 1', value: 78, color: 'bg-blue-500' },
+      { time: 'Wk 2', value: 85, color: 'bg-emerald-500' },
+      { time: 'Wk 3', value: 62, color: 'bg-blue-600' },
+      { time: 'Wk 4', value: 93, color: 'bg-emerald-600' },
+    ],
+    Annually: [
+      { time: 'Jan', value: 65, color: 'bg-blue-400' },
+      { time: 'Feb', value: 70, color: 'bg-blue-500' },
+      { time: 'Mar', value: 82, color: 'bg-emerald-500' },
+      { time: 'Apr', value: 55, color: 'bg-blue-400' },
+      { time: 'May', value: 90, color: 'bg-emerald-600' },
+      { time: 'Jun', value: 73, color: 'bg-blue-600' },
+      { time: 'Jul', value: 60, color: 'bg-blue-400' },
+      { time: 'Aug', value: 85, color: 'bg-emerald-500' },
+      { time: 'Sep', value: 77, color: 'bg-blue-500' },
+      { time: 'Oct', value: 68, color: 'bg-blue-400' },
+      { time: 'Nov', value: 95, color: 'bg-emerald-600' },
+      { time: 'Dec', value: 88, color: 'bg-emerald-500' },
+    ],
+  };
+
+  // Dynamic pie chart + top products per timeframe
+  const staffPieData: Record<string, { otc: number; rx: number; suppl: number; other: number; products: { name: string; qty: number }[] }> = {
+    Daily: { otc: 45, rx: 30, suppl: 15, other: 10, products: [{ name: 'Biogesic 500mg', qty: 45 }, { name: 'Neozep Forte', qty: 32 }, { name: 'Ascorbic Acid', qty: 28 }] },
+    Weekly: { otc: 38, rx: 35, suppl: 18, other: 9, products: [{ name: 'Amoxicillin', qty: 120 }, { name: 'Paracetamol', qty: 98 }, { name: 'Vitamin C', qty: 76 }] },
+    Monthly: { otc: 42, rx: 28, suppl: 20, other: 10, products: [{ name: 'Biogesic 500mg', qty: 485 }, { name: 'Amoxicillin', qty: 342 }, { name: 'Cetirizine', qty: 210 }] },
+    Annually: { otc: 40, rx: 32, suppl: 17, other: 11, products: [{ name: 'Paracetamol', qty: 5200 }, { name: 'Biogesic', qty: 4100 }, { name: 'Amoxicillin', qty: 3800 }] },
+  };
+
+  const currentBarData = staffBarData[staffBarTF] || staffBarData.Daily;
+  const currentPieData = staffPieData[staffPieTF] || staffPieData.Daily;
+
   // STAFF VIEW
   if (userRole === "Staff") {
     return (
@@ -75,9 +134,12 @@ export function Dashboard({ userRole }: DashboardProps) {
              {/* Hourly Sales Trend */}
              <Card className="rounded-[1rem] shadow-sm border border-slate-200">
                 <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-100 bg-slate-50/50">
-                   <div>
-                      <CardTitle className="text-lg font-extrabold text-slate-800">My Hourly Sales Trend</CardTitle>
-                      <p className="text-xs font-medium text-slate-500 mt-1">Easily readable transactional volume per hour.</p>
+                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                      <div>
+                         <CardTitle className="text-lg font-extrabold text-slate-800">My Hourly Sales Trend</CardTitle>
+                         <p className="text-xs font-medium text-slate-500 mt-1">Transactional volume per hour.</p>
+                      </div>
+                      <TimeframeSelector defaultValue="Daily" onChange={(tf) => setStaffBarTF(tf)} />
                    </div>
                 </CardHeader>
                 <CardContent className="p-6 md:p-8">
@@ -90,7 +152,7 @@ export function Dashboard({ userRole }: DashboardProps) {
                          ))}
                       </div>
                       
-                      {[
+                      {currentBarData /*[
                         { time: '8 AM', value: 30, color: 'bg-blue-500' },
                         { time: '9 AM', value: 55, color: 'bg-blue-600' },
                         { time: '10 AM', value: 85, color: 'bg-emerald-500' },
@@ -98,11 +160,11 @@ export function Dashboard({ userRole }: DashboardProps) {
                         { time: '12 PM', value: 95, color: 'bg-emerald-600' },
                         { time: '1 PM', value: 65, color: 'bg-blue-600' },
                         { time: '2 PM', value: 10, color: 'bg-slate-300' },
-                      ].map((bar, i) => (
+                      ]*/.map((bar, i) => (
                          // Custom hover title tooltip
-                         <div key={i} title={`${bar.time} - ${bar.value} sales processed`} className="flex flex-col items-center justify-end flex-1 z-10 h-full relative group cursor-pointer hover:bg-slate-50/50 rounded-lg transition-colors">
+                         <div key={`${staffBarTF}-${i}`} title={`${bar.time} - ${bar.value} sales`} className="flex flex-col items-center justify-end flex-1 z-10 h-full relative group cursor-pointer hover:bg-slate-50/50 rounded-lg transition-colors">
                             <span className="text-[11px] md:text-xs font-black text-slate-800 mb-1 group-hover:-translate-y-1 transition-transform">{bar.value}</span>
-                            <div className={cn("w-full max-w-[32px] md:max-w-[48px] rounded-t-lg shadow-sm border border-black/5 group-hover:brightness-110", bar.color)} style={{ height: `${bar.value}%` }}></div>
+                            <div className={cn("w-full max-w-[32px] md:max-w-[48px] rounded-t-lg shadow-sm border border-black/5 group-hover:brightness-110 transition-all duration-500", bar.color)} style={{ height: `${bar.value}%` }}></div>
                             <span className="absolute -bottom-6 text-[9px] md:text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">{bar.time}</span>
                          </div>
                       ))}
@@ -112,12 +174,14 @@ export function Dashboard({ userRole }: DashboardProps) {
 
              {/* Personal Pie Chart and Top Products */}
              <Card className="rounded-[1rem] shadow-sm border border-slate-200">
-                <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-100 bg-slate-50/50 flex flex-row justify-between items-center">
-                   <div>
-                     <CardTitle className="text-lg font-extrabold text-slate-800">My Categories & Products</CardTitle>
-                     <p className="text-xs font-medium text-slate-500 mt-1">Clearly divided breakdown of your sales.</p>
+                <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-100 bg-slate-50/50">
+                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                     <div>
+                       <CardTitle className="text-lg font-extrabold text-slate-800">My Categories & Products</CardTitle>
+                       <p className="text-xs font-medium text-slate-500 mt-1">Breakdown of your sales.</p>
+                     </div>
+                     <TimeframeSelector defaultValue="Daily" onChange={(tf) => setStaffPieTF(tf)} />
                    </div>
-                   <PieChart className="w-5 h-5 text-slate-400" />
                 </CardHeader>
                 <CardContent className="p-6 md:p-8 pt-6 flex flex-col md:flex-row items-center gap-8">
                    
@@ -125,30 +189,26 @@ export function Dashboard({ userRole }: DashboardProps) {
                       <div 
                         title="Pie distribution of category volume"
                         className="w-36 h-36 rounded-full shadow-inner border border-slate-100 relative mb-4 hover:scale-[1.02] transition-transform cursor-pointer" 
-                        style={{ background: 'conic-gradient(#10b981 0% 45%, #3b82f6 45% 75%, #f59e0b 75% 90%, #94a3b8 90% 100%)' }}>
+                        style={{ background: `conic-gradient(#10b981 0% ${currentPieData.otc}%, #3b82f6 ${currentPieData.otc}% ${currentPieData.otc + currentPieData.rx}%, #f59e0b ${currentPieData.otc + currentPieData.rx}% ${currentPieData.otc + currentPieData.rx + currentPieData.suppl}%, #94a3b8 ${currentPieData.otc + currentPieData.rx + currentPieData.suppl}% 100%)` }}>
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] font-bold text-slate-600">
-                         <div title="Volume: 45%" className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-brand-green rounded-sm"></div> OTC (45%)</div>
-                         <div title="Volume: 30%" className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-brand-blue rounded-sm"></div> Rx (30%)</div>
-                         <div title="Volume: 15%" className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-yellow-500 rounded-sm"></div> Suppl (15%)</div>
-                         <div title="Volume: 10%" className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-slate-400 rounded-sm"></div> Other (10%)</div>
+                         <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-brand-green rounded-sm"></div> OTC ({currentPieData.otc}%)</div>
+                         <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-brand-blue rounded-sm"></div> Rx ({currentPieData.rx}%)</div>
+                         <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-yellow-500 rounded-sm"></div> Suppl ({currentPieData.suppl}%)</div>
+                         <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900"><div className="w-2.5 h-2.5 bg-slate-400 rounded-sm"></div> Other ({currentPieData.other}%)</div>
                       </div>
                    </div>
 
                    <div className="w-full space-y-4">
                      <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">Top Solid Items</h4>
-                     {[
-                       { name: "Biogesic 500mg", qty: 45, max: 50, color: "bg-brand-blue" },
-                       { name: "Neozep Forte", qty: 32, max: 50, color: "bg-emerald-500" },
-                       { name: "Ascorbic Acid", qty: 28, max: 50, color: "bg-yellow-500" },
-                     ].map((item, i) => (
+                     {currentPieData.products.map((item, i) => (
                         <div key={i} title={`${item.qty} ${item.name} distributed.`} className="group cursor-pointer">
                            <div className="flex justify-between text-xs md:text-sm font-bold text-slate-700 mb-1">
                               <span>{item.name}</span>
                               <span className="bg-slate-100 px-2 rounded-sm group-hover:bg-slate-200 transition-colors">{item.qty} units</span>
                            </div>
                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                              <div className={cn("h-full rounded-full transition-all group-hover:brightness-110", item.color)} style={{ width: `${(item.qty / item.max) * 100}%` }}></div>
+                              <div className={cn("h-full rounded-full transition-all duration-500 group-hover:brightness-110", i === 0 ? 'bg-brand-blue' : i === 1 ? 'bg-emerald-500' : 'bg-yellow-500')} style={{ width: `${(item.qty / (currentPieData.products[0]?.qty || 1)) * 100}%` }}></div>
                            </div>
                         </div>
                      ))}
@@ -209,10 +269,13 @@ export function Dashboard({ userRole }: DashboardProps) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
              {/* Readability-first SVG Line Chart */}
              <Card className="lg:col-span-2 rounded-[1rem] shadow-sm border border-slate-200 overflow-hidden relative">
-                <CardHeader className="flex flex-row flex-end justify-between items-center p-6 md:p-8 pb-4 bg-slate-50/50 border-b border-slate-100">
-                   <div>
-                      <CardTitle className="text-lg font-extrabold text-slate-800">Clear Weekly Finance Trend</CardTitle>
-                      <p className="text-xs font-semibold text-slate-500 mt-1">Legible line charts accurately tracking daily nodes.</p>
+                <CardHeader className="flex flex-col gap-3 p-6 md:p-8 pb-4 bg-slate-50/50 border-b border-slate-100">
+                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                      <div>
+                         <CardTitle className="text-lg font-extrabold text-slate-800">Clear Weekly Finance Trend</CardTitle>
+                         <p className="text-xs font-semibold text-slate-500 mt-1">Legible line charts tracking daily nodes.</p>
+                      </div>
+                      <TimeframeSelector defaultValue="Weekly" />
                    </div>
                    <div className="flex gap-4">
                      <span className="flex items-center text-[10px] font-bold text-slate-600 uppercase cursor-help" title="Daily Revenue Track"><div className="w-3 h-3 rounded bg-emerald-500 mr-2"></div>Profit</span>
@@ -372,8 +435,13 @@ export function Dashboard({ userRole }: DashboardProps) {
            {/* Readability Fixed Multi-Line Chart */}
            <Card className="lg:col-span-2 rounded-[1rem] shadow-sm border border-slate-200 overflow-hidden">
               <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-100 bg-slate-50/50">
-                 <CardTitle className="text-lg font-extrabold text-slate-800">Clear Profit & Expense Trajectory Base</CardTitle>
-                 <p className="text-[10px] md:text-xs font-semibold text-slate-500 mt-1 uppercase tracking-widest">Straight-line rendering prevents layout skew.</p>
+                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                    <div>
+                       <CardTitle className="text-lg font-extrabold text-slate-800">Profit & Expense Trajectory</CardTitle>
+                       <p className="text-[10px] md:text-xs font-semibold text-slate-500 mt-1 uppercase tracking-widest">6-month macro financial trend.</p>
+                    </div>
+                    <TimeframeSelector defaultValue="Monthly" />
+                 </div>
               </CardHeader>
               <CardContent className="p-6 md:p-8">
                  <div className="h-64 md:h-72 w-full relative flex items-end ml-2 md:ml-4">

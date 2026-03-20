@@ -237,6 +237,13 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
             <LogOut className="w-5 h-5 shrink-0" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
+          
+          {/* Version */}
+          <div className={cn("mt-4 text-center", isCollapsed ? "px-0" : "px-2")}>
+            <span className="text-[10px] font-bold text-slate-300 tracking-widest uppercase">
+              {isCollapsed ? "v1" : "v1.0.0"}
+            </span>
+          </div>
         </div>
       </nav>
     </aside>

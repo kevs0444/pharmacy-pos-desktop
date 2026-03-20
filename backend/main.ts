@@ -24,7 +24,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    title: 'Pharmacy POS',
+    title: 'BotikaPlus',
     icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.png'),
     autoHideMenuBar: true,
     webPreferences: {
