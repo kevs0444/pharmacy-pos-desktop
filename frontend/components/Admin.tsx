@@ -15,9 +15,11 @@ import {
   Save,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  Receipt
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { ReceiptEditor } from "./ReceiptEditor";
 
 const mockAccounts = [
   { name: "reymart", email: "reymart@curesecure.com", role: "STAFF", status: "Active", seed: "reymart" },
@@ -34,7 +36,7 @@ const INITIAL_MANUFACTURERS = [
 ];
 
 export function Admin() {
-  const [viewState, setViewState] = useState<"dashboard" | "accounts">("dashboard");
+  const [viewState, setViewState] = useState<"dashboard" | "accounts" | "receipt">("dashboard");
   const [isManufacturerModalOpen, setIsManufacturerModalOpen] = useState(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [manufacturers, setManufacturers] = useState(INITIAL_MANUFACTURERS);
@@ -64,6 +66,11 @@ export function Admin() {
     setIsEmployeeModalOpen(false);
     setEmpForm({ name: '', email: '', role: 'STAFF', password: '' });
   };
+  
+  if (viewState === "receipt") {
+     return <ReceiptEditor onBack={() => setViewState("dashboard")} />;
+  }
+
   if (viewState === "accounts") {
      return (
         <div className="h-full w-full flex flex-col bg-slate-50/50 overflow-hidden font-sans">
@@ -125,12 +132,8 @@ export function Admin() {
                        </div>
 
                        {/* Avatar */}
-                       <div className="h-24 w-24 rounded-full mb-6 flex items-end justify-center overflow-hidden bg-brand-light/20 border-4 border-white shadow-md transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-3 relative z-10 self-start">
-                          <img 
-                            src={`https://api.dicebear.com/7.x/notionists/svg?seed=${acc.seed}&backgroundColor=transparent`} 
-                            alt={acc.name} 
-                            className="w-full h-full object-cover scale-[1.4] translate-y-3"
-                          />
+                       <div className="h-24 w-24 rounded-full mb-6 flex items-center justify-center overflow-hidden bg-brand-light/20 border-4 border-white shadow-md transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-3 relative z-10 self-start">
+                          <span className="text-3xl font-black text-brand-blue tracking-tighter uppercase">{acc.name.substring(0, 2)}</span>
                        </div>
                        
                        <div className="flex flex-col space-y-1 relative z-10 w-full mt-auto">
@@ -183,6 +186,10 @@ export function Admin() {
             <p className="text-sm font-medium text-slate-500 mt-1">Hello admin, welcome to the system overview.</p>
           </div>
          <div className="flex flex-wrap gap-3 shrink-0">
+             <button onClick={() => setViewState("receipt")} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-sm active:scale-95 text-sm md:text-base">
+                <Receipt className="w-4 h-4" />
+                Receipt Layout
+             </button>
              <button onClick={() => setIsManufacturerModalOpen(true)} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 md:px-5 rounded-xl transition-colors shadow-sm active:scale-95 text-sm md:text-base">
                 <Building2 className="w-4 h-4" />
                 Add Manufacturer

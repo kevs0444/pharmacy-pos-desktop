@@ -1,22 +1,19 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
-import { Package, Search, Plus, X, Save, LayoutGrid, List, Pencil, Pill } from "lucide-react";
+import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List } from "lucide-react";
 import { cn } from "../lib/utils";
-
-const INITIAL_INVENTORY = [
-  { id: 1, code: "PRD-X91A", name: "Amoxicillin 500mg", category: "Prescription", stock: 120, unit: "boxes", unitPrice: 3.20, sellingPrice: 4.50, status: "Good" },
-  { id: 2, code: "PRD-V002", name: "Vitamin C Ascorbic Acid", category: "OTC", stock: 42, unit: "btls", unitPrice: 8.50, sellingPrice: 12.00, status: "Moderate" },
-  { id: 3, code: "PRD-C119", name: "Paracetamol 500mg", category: "Generic", stock: 5, unit: "boxes", unitPrice: 1.20, sellingPrice: 2.00, status: "Critical" },
-  { id: 4, code: "PRD-B445", name: "Cetirizine 10mg", category: "OTC", stock: 85, unit: "boxes", unitPrice: 2.80, sellingPrice: 5.00, status: "Good" },
-  { id: 5, code: "PRD-D780", name: "Losartan 50mg", category: "Prescription", stock: 15, unit: "boxes", unitPrice: 5.50, sellingPrice: 8.75, status: "Moderate" },
-];
-
-type InventoryItem = typeof INITIAL_INVENTORY[0];
+import { ProductCatalogFilter } from "./ProductCatalogFilter";
+import { INVENTORY_DB, InventoryItem } from "../lib/mockData";
+import { ProductCard } from "./ProductCard";
 
 const emptyForm = () => ({
   code: `PRD-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
   name: "",
   genericName: "",
+  manufacturer: "",
+  brandType: "Generic",
+  dosageForm: "",
+  requiresPrescription: false,
   category: "OTC",
   stock: "",
   unitPrice: "",
@@ -25,11 +22,15 @@ const emptyForm = () => ({
 });
 
 export function Inventory() {
-  const [items, setItems] = useState(INITIAL_INVENTORY);
+  const [items, setItems] = useState<InventoryItem[]>(INVENTORY_DB);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "card">("card");
+  
+  const [selectedCategory, setSelectedCategory] = useState("All Products");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const onToggleSort = () => setSortOrder(prev => prev === "asc" ? "desc" : "asc");
   
   // Form State
   const [formData, setFormData] = useState(emptyForm());
@@ -45,12 +46,16 @@ export function Inventory() {
     setFormData({
       code: item.code,
       name: item.name,
-      genericName: "",
+      genericName: item.genericName || "",
+      manufacturer: item.manufacturer || "",
+      brandType: item.brandType,
+      dosageForm: item.dosageForm || "",
+      requiresPrescription: item.requiresPrescription || false,
       category: item.category,
       stock: String(item.stock),
       unitPrice: String(item.unitPrice),
       sellingPrice: String(item.sellingPrice),
-      expiryDate: ""
+      expiryDate: item.expiryDate || ""
     });
     setIsModalOpen(true);
   };
@@ -64,24 +69,37 @@ export function Inventory() {
         ...it,
         code: formData.code,
         name: formData.name,
-        category: formData.category,
+        genericName: formData.genericName,
+        manufacturer: formData.manufacturer,
+        brandType: formData.brandType as any,
+        dosageForm: formData.dosageForm,
+        requiresPrescription: formData.requiresPrescription,
+        category: formData.category as any,
         stock: parseInt(formData.stock) || 0,
         unitPrice: parseFloat(formData.unitPrice) || 0,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
+        expiryDate: formData.expiryDate,
         status: (parseInt(formData.stock) || 0) > 20 ? "Good" : (parseInt(formData.stock) || 0) > 5 ? "Moderate" : "Critical"
       } : it));
     } else {
       // Add new item
-      const newItem = {
+      const newItem: InventoryItem = {
         id: Date.now(),
         code: formData.code,
         name: formData.name,
-        category: formData.category,
+        genericName: formData.genericName,
+        manufacturer: formData.manufacturer,
+        brandType: formData.brandType as any,
+        dosageForm: formData.dosageForm,
+        requiresPrescription: formData.requiresPrescription,
+        category: formData.category as any,
         stock: parseInt(formData.stock) || 0,
         unit: "pcs",
         unitPrice: parseFloat(formData.unitPrice) || 0,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
-        status: (parseInt(formData.stock) || 0) > 20 ? "Good" : "Moderate"
+        expiryDate: formData.expiryDate,
+        status: (parseInt(formData.stock) || 0) > 20 ? "Good" : "Moderate",
+        salesCount: 0
       };
       setItems([newItem, ...items]);
     }
@@ -91,23 +109,26 @@ export function Inventory() {
     setFormData(emptyForm());
   };
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const sortedFilteredItems = [...items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "All Products" || selectedCategory === "All" || item.category.toLowerCase().includes(selectedCategory.toLowerCase()) || selectedCategory.toLowerCase().includes(item.category.toLowerCase());
+    return matchesSearch && matchesCategory;
+  })].sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
 
   const inputClass = "w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400 text-sm";
 
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 bg-slate-50 overflow-y-auto relative h-full custom-scrollbar">
+    <div className="flex h-full w-full overflow-hidden bg-slate-50">
+      <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 overflow-y-auto relative custom-scrollbar">
       
       {/* Add/Edit Item Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in slide-in-from-bottom-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             
-            <div className="bg-brand-blue p-6 flex justify-between items-center text-white">
+            <div className="bg-brand-blue p-6 flex justify-between items-center text-white shrink-0">
               <div>
                 <h2 className="text-xl font-bold">{editingItem ? "Edit Pharmacy Item" : "Add New Pharmacy Item"}</h2>
                 <p className="text-sm opacity-80 mt-1">{editingItem ? "Update product details." : "Enter product master data and initial stock."}</p>
@@ -117,48 +138,115 @@ export function Inventory() {
               </button>
             </div>
 
-            <div className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Product Name *</label>
-                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} placeholder="e.g. Biogesic 500mg" />
+            <div className="p-6 md:p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
+              
+              {/* Identity Section */}
+              <div className="space-y-4">
+                <h3 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  <Pill className="w-4 h-4 text-brand-blue" /> Product Identity
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Product Name *</label>
+                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} placeholder="e.g. Biogesic 500mg" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generic Name</label>
+                    <input type="text" value={formData.genericName} onChange={e => setFormData({...formData, genericName: e.target.value})} className={inputClass} placeholder="e.g. Paracetamol" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Barcode / SKU</label>
+                    <input type="text" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} className={cn(inputClass, "font-mono text-brand-blue font-bold")} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacturer / Brand</label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input type="text" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className={cn(inputClass, "pl-9")} placeholder="e.g. Unilab" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Brand Type</label>
+                    <select value={formData.brandType} onChange={e => setFormData({...formData, brandType: e.target.value as any})} className={inputClass}>
+                      <option value="Generic">Generic</option>
+                      <option value="Branded">Branded</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Category</label>
+                    <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className={inputClass}>
+                      <option value="Prescription">Prescription (Rx)</option>
+                      <option value="OTC">Over the Counter (OTC)</option>
+                      <option value="Generic">Generic</option>
+                      <option value="Supplements">Vitamins & Supplements</option>
+                      <option value="Supplies">Medical Supplies</option>
+                      <option value="Personal Care">Personal Care</option>
+                      <option value="Baby & Mom">Baby & Mom</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generic Name</label>
-                  <input type="text" value={formData.genericName} onChange={e => setFormData({...formData, genericName: e.target.value})} className={inputClass} placeholder="e.g. Paracetamol" />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Barcode / SKU</label>
-                  <input type="text" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} className={cn(inputClass, "font-mono")} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Category</label>
-                  <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className={inputClass}>
-                    <option value="Prescription">Prescription (Rx)</option>
-                    <option value="OTC">Over the Counter (OTC)</option>
-                    <option value="Generic">Generic</option>
-                    <option value="Supplements">Vitamins & Supplements</option>
-                    <option value="Supplies">Medical Supplies</option>
-                  </select>
-                </div>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Initial Stock</label>
-                  <input type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} className={inputClass} placeholder="0" />
+              {/* Formulation & Compliance */}
+              <div className="space-y-4">
+                <h3 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  <FlaskConical className="w-4 h-4 text-brand-teal" /> Formulation & Compliance
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dosage Form / Unit</label>
+                    <select value={formData.dosageForm} onChange={e => setFormData({...formData, dosageForm: e.target.value})} className={inputClass}>
+                      <option value="">Select Form...</option>
+                      <option value="Tablet">Tablet</option>
+                      <option value="Capsule">Capsule</option>
+                      <option value="Syrup">Syrup/Suspension</option>
+                      <option value="Drops">Drops</option>
+                      <option value="Cream/Ointment">Cream/Ointment</option>
+                      <option value="Injection">Injection/Vial</option>
+                      <option value="Piece">Piece (Supplies)</option>
+                      <option value="Box">Box</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <label className="flex items-center gap-3 cursor-pointer w-full">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.requiresPrescription} 
+                        onChange={e => setFormData({...formData, requiresPrescription: e.target.checked})} 
+                        className="w-5 h-5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue" 
+                      />
+                      <div>
+                        <span className="text-sm font-bold text-slate-800 block">Requires Prescription (Rx)</span>
+                        <span className="text-xs text-slate-500">Flag this item as Rx-only during POS checkout.</span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Unit Price (₱) — Cost</label>
-                  <input type="number" step="0.01" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className={inputClass} placeholder="0.00" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selling Price (₱)</label>
-                  <input type="number" step="0.01" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: e.target.value})} className={inputClass} placeholder="0.00" />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expiration Date</label>
-                  <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className={cn(inputClass, "text-slate-700")} />
+              </div>
+
+              {/* Pricing & Stock */}
+              <div className="space-y-4">
+                <h3 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">
+                  <Package className="w-4 h-4 text-brand-green" /> Inventory & Pricing
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Initial Stock</label>
+                    <input type="number" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} className={inputClass} placeholder="0" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Unit Price (₱) — Cost</label>
+                    <input type="number" step="0.01" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className={inputClass} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selling Price (₱)</label>
+                    <input type="number" step="0.01" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: e.target.value})} className={inputClass} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expiration Date</label>
+                    <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className={cn(inputClass, "text-slate-700 font-medium")} />
+                  </div>
                 </div>
               </div>
 
@@ -202,11 +290,18 @@ export function Inventory() {
         </button>
       </div>
 
+      <ProductCatalogFilter 
+         selectedCategory={selectedCategory} 
+         onSelectCategory={setSelectedCategory} 
+         sortOrder={sortOrder} 
+         onToggleSort={onToggleSort} 
+      />
+
       <Card className="border-t-4 border-t-brand-teal relative z-10 overflow-hidden">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 md:pb-6 gap-3 md:gap-4">
           <CardTitle className="text-lg md:text-xl font-bold text-slate-800">Product List</CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-64 md:w-80">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64 md:w-80">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text"
@@ -216,150 +311,105 @@ export function Inventory() {
                 className="w-full pl-9 pr-3 py-2 md:py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-sm font-medium transition-all"
               />
             </div>
-            {/* View Mode Toggle */}
-            <div className="hidden md:flex bg-slate-100 p-1 rounded-xl shrink-0 border border-slate-200">
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0">
               <button 
-                onClick={() => setViewMode("list")}
-                className={cn("px-3 py-1.5 rounded-lg flex items-center justify-center transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
-                title="Table View"
+                onClick={() => setViewMode("list")} 
+                className={cn("p-1.5 md:p-2 rounded-md transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")}
+                title="List View"
               >
-                <List className="w-4 h-4" />
+                <List className="w-4 h-4 md:w-5 md:h-5" />
               </button>
               <button 
-                onClick={() => setViewMode("card")}
-                className={cn("px-3 py-1.5 rounded-lg flex items-center justify-center transition-all", viewMode === "card" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
+                onClick={() => setViewMode("card")} 
+                className={cn("p-1.5 md:p-2 rounded-md transition-all", viewMode === "card" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")}
                 title="Card View"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3 md:p-6">
+        <CardContent className="p-3 md:p-6 bg-slate-50/50 min-h-[500px]">
 
-          {/* ===== TABLE / LIST VIEW ===== */}
-          {viewMode === "list" && (
-            <div className="relative w-full overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-black tracking-wider">
-                  <tr>
-                    <th className="px-4 py-4">Item Code</th>
-                    <th className="px-4 py-4">Product Name</th>
-                    <th className="px-4 py-4">Category</th>
-                    <th className="px-4 py-4">Stock</th>
-                    <th className="px-4 py-4">Unit Price</th>
-                    <th className="px-4 py-4">Selling Price</th>
-                    <th className="px-4 py-4">Margin</th>
-                    <th className="px-4 py-4">Status</th>
-                    <th className="px-4 py-4 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredItems.map(item => (
-                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                       <td className="px-4 py-4 font-mono text-slate-500 text-xs font-semibold">{item.code}</td>
-                       <td className="px-4 py-4 font-bold text-brand-blue group-hover:text-brand-green transition-colors">{item.name}</td>
-                       <td className="px-4 py-4 font-medium"><span className="bg-slate-100 px-2.5 py-1 rounded-md text-slate-600 text-xs">{item.category}</span></td>
-                       <td className="px-4 py-4 font-semibold">
-                         <span className={item.stock < 10 ? "text-red-500" : "text-slate-800"}>{item.stock}</span> 
-                         <span className="text-slate-400 text-xs ml-1 font-normal">{item.unit}</span>
-                       </td>
-                       <td className="px-4 py-4 font-semibold text-slate-500">₱{item.unitPrice.toFixed(2)}</td>
-                       <td className="px-4 py-4 font-bold text-brand-blue">₱{item.sellingPrice.toFixed(2)}</td>
-                       <td className="px-4 py-4">
-                         <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                           +₱{(item.sellingPrice - item.unitPrice).toFixed(2)}
-                         </span>
-                       </td>
-                       <td className="px-4 py-4">
-                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                           item.status === 'Good' ? 'bg-emerald-100 text-emerald-700' :
-                           item.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700' :
-                           'bg-red-100 text-red-700'
-                         }`}>
-                           {item.status}
-                         </span>
-                       </td>
-                       <td className="px-4 py-4 text-center">
-                         <button 
-                           onClick={() => openEditModal(item)}
-                           className="p-2 text-slate-400 hover:text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-all"
-                           title="Edit Item"
-                         >
-                           <Pencil className="w-4 h-4" />
-                         </button>
-                       </td>
-                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ===== CARD VIEW ===== */}
-          {viewMode === "card" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredItems.map(item => (
-                <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden group">
-                  {/* Icon Header */}
-                  <div className="h-16 bg-gradient-to-br from-brand-blue/10 to-brand-green/10 flex items-center justify-center relative">
-                    <Pill className="w-7 h-7 text-brand-blue/30" />
-                    <span className="absolute top-2 left-2 bg-white/80 backdrop-blur-sm text-[10px] font-bold text-slate-500 px-2 py-0.5 rounded-md font-mono">{item.code}</span>
-                    <button 
-                      onClick={() => openEditModal(item)}
-                      className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm text-slate-400 hover:text-brand-blue rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                      title="Edit"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-4 flex flex-col flex-1">
-                    <span className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider self-start mb-2">{item.category}</span>
-                    <h3 className="font-extrabold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors">{item.name}</h3>
-                    
-                    <div className="mt-auto pt-4 space-y-2">
-                      <div className="flex justify-between items-baseline">
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Unit Price</p>
-                          <p className="text-sm font-bold text-slate-500">₱{item.unitPrice.toFixed(2)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Selling Price</p>
-                          <p className="text-lg font-black text-brand-blue leading-none">₱{item.sellingPrice.toFixed(2)}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn("text-sm font-black", item.stock < 10 ? "text-red-500" : item.stock < 50 ? "text-yellow-600" : "text-emerald-600")}>{item.stock}</span>
-                          <span className="text-xs text-slate-400 font-medium">{item.unit}</span>
-                        </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.status === 'Good' ? 'bg-emerald-100 text-emerald-700' :
-                          item.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </div>
-
-                      <div className="bg-emerald-50 rounded-lg px-3 py-1.5 flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-emerald-600 uppercase">Margin</span>
-                        <span className="text-xs font-black text-emerald-700">+₱{(item.sellingPrice - item.unitPrice).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            {viewMode === "list" ? (
+              <div className="relative w-full overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-black tracking-wider">
+                    <tr>
+                      <th className="px-4 py-4">Item Code</th>
+                      <th className="px-4 py-4">Product Name</th>
+                      <th className="px-4 py-4">Category</th>
+                      <th className="px-4 py-4">Stock</th>
+                      <th className="px-4 py-4">Unit Price</th>
+                      <th className="px-4 py-4">Selling Price</th>
+                      <th className="px-4 py-4">Margin</th>
+                      <th className="px-4 py-4">Status</th>
+                      <th className="px-4 py-4 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {sortedFilteredItems.map(item => (
+                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                         <td className="px-4 py-4 font-mono text-slate-500 text-xs font-semibold">{item.code}</td>
+                         <td className="px-4 py-4 font-bold text-brand-blue group-hover:text-brand-green transition-colors flex flex-col items-start gap-1">
+                           <span>{item.name}</span>
+                           {item.requiresPrescription && <span className="bg-red-50 text-red-500 text-[9px] px-1.5 py-0.5 rounded border border-red-100 uppercase font-black" title="Prescription Required">Rx</span>}
+                         </td>
+                         <td className="px-4 py-4 font-medium"><span className="bg-slate-100 px-2.5 py-1 rounded-md text-slate-600 text-xs font-bold uppercase tracking-wider">{item.category}</span></td>
+                         <td className="px-4 py-4 font-semibold">
+                           <span className={item.stock < 10 ? "text-red-500 font-black" : "text-slate-800"}>{item.stock}</span> 
+                           <span className="text-slate-400 text-xs ml-1 font-normal">{item.unit}</span>
+                         </td>
+                         <td className="px-4 py-4 font-semibold text-slate-500">₱{item.unitPrice.toFixed(2)}</td>
+                         <td className="px-4 py-4 font-bold text-brand-blue">
+                           ₱{(item.discount ? item.sellingPrice * (1 - item.discount / 100) : item.sellingPrice).toFixed(2)}
+                           {item.discount && <span className="block text-[10px] text-slate-400 line-through">₱{item.sellingPrice.toFixed(2)}</span>}
+                         </td>
+                         <td className="px-4 py-4">
+                           <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                             +₱{((item.discount ? item.sellingPrice * (1 - item.discount / 100) : item.sellingPrice) - item.unitPrice).toFixed(2)}
+                           </span>
+                         </td>
+                         <td className="px-4 py-4">
+                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                             item.status === 'Good' ? 'bg-emerald-100 text-emerald-700' :
+                             item.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700' :
+                             'bg-red-100 text-red-700'
+                           }`}>
+                             {item.status}
+                           </span>
+                         </td>
+                         <td className="px-4 py-4 text-center">
+                           <button 
+                             onClick={() => openEditModal(item)}
+                             className="p-2 text-slate-400 hover:text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-all"
+                             title="Edit Item"
+                           >
+                             <Pencil className="w-4 h-4" />
+                           </button>
+                         </td>
+                       </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {sortedFilteredItems.map(item => (
+                  <ProductCard 
+                     key={item.id} 
+                     product={item} 
+                     viewMode="inventory" 
+                     onAction={openEditModal} 
+                  />
+                ))}
+              </div>
+            )}
 
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-between text-sm text-slate-500">
              <div className="flex items-center gap-2 font-medium bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
                 <Package className="w-4 h-4 text-brand-blue" /> 
-                <span>Showing {filteredItems.length} items</span>
+                <span>Showing {sortedFilteredItems.length} items</span>
              </div>
              <div className="flex gap-2 mt-4 sm:mt-0">
                 <button className="px-4 py-2 border border-slate-200 text-slate-600 font-semibold rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50">Previous</button>
@@ -368,6 +418,7 @@ export function Inventory() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

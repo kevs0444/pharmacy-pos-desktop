@@ -1,74 +1,83 @@
 import { useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill } from "lucide-react";
 import { cn } from "../lib/utils";
+import { ProductCatalogFilter } from "./ProductCatalogFilter";
 
-// TEMPORARY PHASE 1 MOCK DATA (No Backend Yet) - No images per client decision
-const DUMMY_PRODUCTS = [
-  { id: '1', name: 'Amoxicillin 500mg', category: 'Antibiotic', price: 12.50, stock: 150, salesCount: 120, requiresPrescription: true },
-  { id: '2', name: 'Vitamin C Complex', category: 'Vitamins', price: 8.99, stock: 45, salesCount: 300, requiresPrescription: false },
-  { id: '3', name: 'Paracetamol 500mg', category: 'Pain Relief', price: 4.50, stock: 320, salesCount: 500, requiresPrescription: false },
-  { id: '4', name: 'Ibuprofen 400mg', category: 'Pain Relief', price: 6.20, stock: 80, salesCount: 200, requiresPrescription: false },
-  { id: '5', name: 'First Aid Kit', category: 'Supplies', price: 24.99, stock: 12, salesCount: 15, requiresPrescription: false },
-  { id: '6', name: 'Cough Syrup', category: 'Cold & Flu', price: 11.25, stock: 0, salesCount: 80, requiresPrescription: false },
-  { id: '7', name: 'Bandages Pack', category: 'Outer Care', price: 3.49, stock: 200, salesCount: 150, requiresPrescription: false },
-  { id: '8', name: 'Eye Drops', category: 'Eye Care', price: 9.99, stock: 34, salesCount: 40, requiresPrescription: false },
-];
+// TEMPORARY PHASE 1 MOCK DATA (No Backend Yet)
+import { INVENTORY_DB, InventoryItem } from "../lib/mockData";
+import { ProductCard } from "./ProductCard";
 
 export function POS() {
-  const [cart, setCart] = useState<{product: typeof DUMMY_PRODUCTS[0], qty: number}[]>([]);
+  const [cart, setCart] = useState<{product: InventoryItem, qty: number}[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [showRxOnly, setShowRxOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const onToggleSort = () => setSortOrder(prev => prev === "asc" ? "desc" : "asc");
   // List view enforced per client Phase 1
 
-  const addToCart = (product: typeof DUMMY_PRODUCTS[0]) => {
+  const getAvailableStock = (product: InventoryItem) => {
+    const inCart = cart.find(item => item.product.id === product.id)?.qty || 0;
+    return Math.max(0, product.stock - inCart);
+  };
+
+  const addToCart = (product: InventoryItem) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
+        if (existing.qty >= product.stock) return prev; // Stop at stock limit
         return prev.map(item => 
           item.product.id === product.id ? { ...item, qty: item.qty + 1 } : item
         );
       }
+      if (product.stock < 1) return prev;
       return [...prev, { product, qty: 1 }];
     });
   };
 
-  const updateQty = (id: string, delta: number) => {
+  const updateQty = (id: number, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.product.id === id) {
-        const newQty = Math.max(1, item.qty + delta);
+        const newQty = Math.max(1, Math.min(item.qty + delta, item.product.stock));
         return { ...item, qty: newQty };
       }
       return item;
     }));
   };
 
-  const setExactQty = (id: string, qty: number) => {
+  const setExactQty = (id: number, qty: number) => {
     setCart(prev => prev.map(item => {
       if (item.product.id === id) {
-        return { ...item, qty: qty };
+        return { ...item, qty: Math.max(0, Math.min(qty, item.product.stock)) };
       }
       return item;
     }));
   };
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (id: number) => {
     setCart(prev => prev.filter(item => item.product.id !== id));
   };
 
-  const categories = ["All", ...new Set(DUMMY_PRODUCTS.map(p => p.category))];
-  const filteredProducts = DUMMY_PRODUCTS.filter(p => {
+
+  const filteredProducts = INVENTORY_DB.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+    const matchesCategory = selectedCategory === "All" || selectedCategory === "All Products" || p.category.toLowerCase().includes(selectedCategory.toLowerCase()) || selectedCategory.toLowerCase().includes(p.category.toLowerCase());
     const matchesRx = showRxOnly ? p.requiresPrescription : true;
     return matchesSearch && matchesCategory && matchesRx;
   });
 
-  const topSellingProducts = [...DUMMY_PRODUCTS]
+  const sortedFilteredProducts = [...filteredProducts].sort((a, b) => {
+     return sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+  });
+
+  const topSellingProducts = [...INVENTORY_DB]
     .sort((a, b) => b.salesCount - a.salesCount)
     .slice(0, 3);
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
+  const subtotal = cart.reduce((sum, item) => {
+    const p = item.product.discount ? item.product.sellingPrice * (1 - item.product.discount/100) : item.product.sellingPrice;
+    return sum + (p * item.qty);
+  }, 0);
   const total = subtotal; // VAT removed per client request
 
   // Checkout State
@@ -276,10 +285,10 @@ export function POS() {
                       </h4>
                       <div className="flex justify-between items-center text-xs text-slate-500 mt-2 font-semibold">
                          <span className="bg-slate-100 px-2 py-1 rounded-md">Qty: {item.qty}</span>
-                         <span>₱{item.product.price.toFixed(2)} / ea</span>
+                         <span>₱{(item.product.discount ? item.product.sellingPrice * (1 - item.product.discount/100) : item.product.sellingPrice).toFixed(2)} / ea</span>
                       </div>
                       <div className="text-right text-sm font-extrabold text-brand-green mt-2">
-                         Subtotal: ₱{(item.product.price * item.qty).toFixed(2)}
+                         Subtotal: ₱{((item.product.discount ? item.product.sellingPrice * (1 - item.product.discount/100) : item.product.sellingPrice) * item.qty).toFixed(2)}
                       </div>
                    </div>
                 ))}
@@ -292,8 +301,20 @@ export function POS() {
 
           {/* Right Side: Payment Details */}
           <div className="flex-1 p-6 lg:p-10 overflow-y-auto flex flex-col bg-slate-50 relative custom-scrollbar">
-             <button onClick={() => setIsCheckoutOpen(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 border border-slate-200 p-2 rounded-full bg-white transition-colors z-10 shadow-sm">
-               <Delete className="w-5 h-5" />
+             <button 
+               onClick={() => {
+                 if (window.confirm("Are you sure you want to cancel this entire transaction? All items will be removed and stock will be restored.")) {
+                   setIsCheckoutOpen(false);
+                   setCart([]);
+                   setCashTenderedStr("");
+                   setDiscountType("None");
+                   setDiscountInfo(null);
+                   setDoctorInfo(null);
+                 }
+               }} 
+               className="absolute top-6 right-6 text-red-500 hover:text-white hover:bg-red-500 border border-red-200 px-4 py-2 rounded-xl bg-white transition-all z-10 shadow-sm flex items-center gap-2 font-bold text-sm group"
+             >
+               <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" /> Cancel Transaction
              </button>
              <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-8 pr-12">Payment Terminal</h2>
              
@@ -437,9 +458,8 @@ export function POS() {
         </div>
       )}
 
-      {/* Main POS Interface */}
-      {/* Products Grid (Left Area) */}
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+      {/* Main POS Interface (Center Area) */}
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden bg-slate-50 relative z-0">
         <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-800">Point of Sale</h1>
@@ -458,33 +478,25 @@ export function POS() {
           </div>
         </div>
 
-        {/* Categories List */}
-        <div className="flex justify-between items-center mb-6 gap-4">
-          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar flex-1">
-            {categories.map(cat => (
-               <button
-                 key={cat}
-                 onClick={() => setSelectedCategory(cat)}
-                 className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors",
-                    selectedCategory === cat 
-                      ? "bg-brand-blue text-white shadow-md shadow-brand-blue/20" 
-                      : "bg-white text-slate-500 hover:bg-slate-100 hover:text-brand-blue border border-slate-200"
-                 )}
-               >
-                 {cat}
-               </button>
-            ))}
-          </div>
-          <button 
-            onClick={() => setShowRxOnly(!showRxOnly)}
-            className={cn(
-               "px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 border shadow-sm shrink-0",
-               showRxOnly ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-500 hover:bg-slate-50 border-slate-200"
-            )}
-          >
-            {showRxOnly ? "Showing Rx Only" : "Filter Rx Items"}
-          </button>
+        {/* Top Filters & Search */}
+        <div className="flex flex-col gap-4 mb-4">
+           <ProductCatalogFilter 
+             selectedCategory={selectedCategory} 
+             onSelectCategory={setSelectedCategory} 
+             sortOrder={sortOrder} 
+             onToggleSort={onToggleSort} 
+           />
+           <div className="flex justify-end items-center mb-2 gap-4">
+             <button 
+               onClick={() => setShowRxOnly(!showRxOnly)}
+               className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 border shadow-sm shrink-0",
+                  showRxOnly ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-500 hover:bg-slate-50 border-slate-200"
+               )}
+             >
+               {showRxOnly ? "Showing Rx Only" : "Filter Rx Items"}
+             </button>
+           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar content-start flex flex-col gap-6">
@@ -495,48 +507,18 @@ export function POS() {
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                 🔥 Top Selling
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3">
-                {topSellingProducts.map(product => (
-                  <div 
-                    key={`top-${product.id}`} 
-                    onClick={() => product.stock > 0 && addToCart(product)}
-                    className={cn(
-                      "bg-brand-blue/5 rounded-2xl shadow-sm border border-brand-blue/10 cursor-pointer hover:shadow-md hover:bg-brand-blue/10 transition-all group duration-300 active:scale-95 flex flex-col p-4 gap-3 relative overflow-hidden",
-                      product.stock === 0 && "opacity-60 cursor-not-allowed hover:bg-brand-blue/5"
-                    )}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest">{product.category}</p>
-                          {product.requiresPrescription && <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] uppercase font-black tracking-wider shadow-sm" title="Prescription Required">Rx Required</span>}
-                        </div>
-                        <h3 className="font-extrabold text-brand-blue text-base leading-tight group-hover:text-brand-blue transition-colors line-clamp-1 pr-6">
-                           {product.name}
-                        </h3>
-                        <p className="text-[10px] font-bold text-emerald-600 bg-emerald-100/50 w-fit px-2 py-0.5 rounded-full mt-2 border border-emerald-200/50">
-                          🔥 {product.salesCount} Sold
-                        </p>
-                      </div>
-                      {product.stock === 0 && (
-                        <span className="text-[10px] font-black uppercase bg-red-500 text-white px-2 py-1 rounded-md shrink-0 absolute top-3 right-3 shadow-sm">Out of Stock</span>
-                      )}
-                    </div>
-                    
-                    <div className="mt-auto flex items-end justify-between pt-2">
-                      <div>
-                        <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest mb-0.5">Price</p>
-                        <p className="font-black text-brand-blue text-lg leading-none">₱{product.price.toFixed(2)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest mb-0.5">Stock</p>
-                        <p className={cn("font-black leading-none whitespace-nowrap text-sm", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>
-                          {product.stock === 0 ? "0" : `${product.stock}`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {topSellingProducts.map(product => {
+                  const available = getAvailableStock(product);
+                  return (
+                    <ProductCard 
+                      key={`top-${product.id}`} 
+                      product={product} 
+                      viewMode="pos" 
+                      onAction={addToCart}
+                      disabled={available <= 0}
+                    />
+                )})}
               </div>
             </div>
           )}
@@ -544,43 +526,18 @@ export function POS() {
           {/* All Products List */}
           <div>
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">All Products</h3>
-            <div className="flex flex-col gap-2">
-              {filteredProducts.map(product => (
-                <div 
-                  key={product.id} 
-                  onClick={() => product.stock > 0 && addToCart(product)}
-                  className={cn(
-                    "bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group duration-200 active:scale-95 flex flex-row items-center p-3 gap-4",
-                    product.stock === 0 && "opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm"
-                  )}
-                >
-                  <div className="flex flex-1 flex-row items-center justify-between py-1 pr-2">
-                    <div className="flex flex-col justify-center">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{product.category}</p>
-                        {product.requiresPrescription && <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[8px] uppercase font-black tracking-wider border border-red-100" title="Prescription Required">Rx Required</span>}
-                      </div>
-                      <h3 className="font-extrabold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors line-clamp-1">
-                         {product.name}
-                      </h3>
-                    </div>
-                    
-                    <div className="flex items-center gap-6 md:gap-12 pl-4">
-                      <div className="w-16">
-                        <p className="font-black text-brand-blue text-base leading-none">₱{product.price.toFixed(2)}</p>
-                      </div>
-                      <div className="text-right w-16">
-                        <p className={cn("font-black leading-none whitespace-nowrap text-xs", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>
-                          {product.stock === 0 ? "OUT" : `${product.stock} left`}
-                        </p>
-                      </div>
-                      <button className="py-2 px-5 bg-slate-100 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider shrink-0 pointer-events-none border border-slate-200 group-hover:border-transparent">
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {sortedFilteredProducts.map(product => {
+                const available = getAvailableStock(product);
+                return (
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    viewMode="pos" 
+                    onAction={addToCart}
+                    disabled={available <= 0}
+                  />
+              )})}
             </div>
           </div>
           {filteredProducts.length === 0 && (
@@ -628,7 +585,7 @@ export function POS() {
                      </button>
                    </div>
                    <div className="flex items-center justify-between mt-2">
-                     <span className="text-xs font-bold text-brand-green">₱{(item.product.price * item.qty).toFixed(2)}</span>
+                     <span className="text-xs font-bold text-brand-green">₱{((item.product.discount ? item.product.sellingPrice * (1 - item.product.discount/100) : item.product.sellingPrice) * item.qty).toFixed(2)}</span>
                      <div className="flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
                        <button onClick={() => updateQty(item.product.id, -1)} className="p-1 hover:bg-white rounded rounded-l-md transition-colors"><Minus className="w-3 h-3 text-slate-500" /></button>
                        <input 

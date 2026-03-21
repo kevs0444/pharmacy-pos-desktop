@@ -3,70 +3,22 @@ import {
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
-  TrendingUp,
   MonitorPlay,
   LogOut,
   UserCircle,
-  ChevronDown,
-  ChevronRight,
-  Pill,
-  HeartPulse,
-  Baby,
-  Stethoscope,
-  SprayCan,
-  Droplets,
   ShieldCheck,
   Menu
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
-const categoryGroups = [
-  {
-    id: "meds",
-    name: "Medicines",
-    icon: Pill,
-    subcategories: ["Prescription (Rx)", "Over-the-Counter", "Generic", "Branded", "Herbal & Traditional"]
-  },
-  {
-    id: "vitamins",
-    name: "Vitamins & Supplements",
-    icon: HeartPulse,
-    subcategories: ["Multivitamins", "Immunity (Vit C)", "Kids Supplements", "Adult Health"]
-  },
-  {
-    id: "supplies",
-    name: "Medical Supplies",
-    icon: Stethoscope,
-    subcategories: ["First Aid & Wound Care", "Diagnostic (BP & Sugar)", "Masks & PPE", "Mobility & Supports"]
-  },
-  {
-    id: "personal",
-    name: "Personal Care",
-    icon: Droplets,
-    subcategories: ["Bath & Body", "Oral Care", "Hair Care", "Feminine Hygiene"]
-  },
-  {
-    id: "baby",
-    name: "Baby & Mom",
-    icon: Baby,
-    subcategories: ["Milk Formulas", "Diapers & Wipes", "Baby Toiletries", "Maternity Needs"]
-  },
-  {
-    id: "essentials",
-    name: "Household Essentials",
-    icon: SprayCan,
-    subcategories: ["Alcohol & Sanitizers", "Insect Repellents", "First Aid Needs"]
-  }
-];
+
 
 const settingsNav = [
   { name: "POS Terminal", icon: MonitorPlay },
-  { name: "Dashboard", icon: LayoutDashboard },
-  { name: "Admin Panel", icon: ShieldCheck },
-  { name: "Profile", icon: UserCircle },
   { name: "Inventory", icon: Package },
   { name: "Orders", icon: ShoppingCart },
-  { name: "Sales", icon: TrendingUp },
+  { name: "Dashboard", icon: LayoutDashboard },
+  { name: "Admin Panel", icon: ShieldCheck },
 ];
 
 export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel";
@@ -79,13 +31,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: SidebarProps) {
-  const [openCategory, setOpenCategory] = useState<string | null>("meds");
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  const toggleCategory = (id: string) => {
-    if (isCollapsed) setIsCollapsed(false); // Auto-expand if clicking category while collapsed
-    setOpenCategory(prev => prev === id ? null : id);
-  };
 
   return (
     <aside className={cn(
@@ -154,88 +100,34 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
           </ul>
         </div>
 
-        <div>
-           {!isCollapsed ? (
-             <div className="flex items-center justify-between px-2 mb-3">
-                <h3 className="text-[11px] font-extrabold text-brand-green uppercase tracking-widest whitespace-nowrap overflow-hidden">
-                  Product Catalog
-                </h3>
-                <span className="text-[10px] font-bold bg-brand-light text-brand-green px-2 py-0.5 rounded-full shrink-0">Explore</span>
-             </div>
-           ) : (
-             <div className="flex justify-center mb-3">
-                <div className="w-6 border-b-2 border-slate-200"></div>
-             </div>
-           )}
-          
-          <ul className="space-y-1.5">
-            {categoryGroups.map((group) => {
-              const isOpen = openCategory === group.id && !isCollapsed;
-              
-              return (
-                <li key={group.id} className="flex flex-col">
-                  <button 
-                    onClick={() => toggleCategory(group.id)}
-                    className={cn(
-                       "w-full flex items-center py-2.5 rounded-lg text-sm font-semibold transition-colors duration-200",
-                       isCollapsed ? "justify-center px-0" : "justify-between px-3",
-                       isOpen && !isCollapsed ? "bg-slate-50 text-brand-blue" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                       isCollapsed && "hover:bg-slate-50 hover:text-brand-blue"
-                    )}
-                    title={isCollapsed ? group.name : undefined}
-                  >
-                    <div className="flex items-center gap-3">
-                       <group.icon className={cn("shrink-0", isCollapsed ? "w-5 h-5" : "w-4 h-4", isOpen && !isCollapsed ? "text-brand-green" : "text-slate-400", isCollapsed && "text-slate-400")} />
-                       {!isCollapsed && <span className="truncate text-left">{group.name}</span>}
-                    </div>
-                    {!isCollapsed && (isOpen ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />)}
-                  </button>
-                  
-                  {/* Subcategories Accordion Dropdown */}
-                  {!isCollapsed && (
-                    <div className={cn(
-                       "overflow-hidden transition-all duration-300 ease-in-out",
-                       isOpen ? "max-h-64 opacity-100 mt-1" : "max-h-0 opacity-0"
-                    )}>
-                       <ul className="pl-11 pr-2 py-1 space-y-1 border-l-2 border-slate-100 ml-4">
-                         <div className="mt-1 ml-6 pl-4 border-l border-brand-teal/20 space-y-1">
-                          <div
-                            onClick={() => setActiveTab("POS Terminal")}
-                            className="py-2 text-xs font-bold text-brand-blue cursor-pointer hover:text-brand-green transition-colors"
-                          >
-                            View All {group.name}
-                          </div>
-                          {group.subcategories.map((sub) => (
-                            <div
-                              key={sub}
-                              onClick={() => setActiveTab("POS Terminal")}
-                              className="py-1.5 text-xs font-semibold text-slate-500 cursor-pointer hover:text-brand-blue transition-colors truncate"
-                              title={sub}
-                            >
-                              {sub}
-                            </div>
-                          ))}
-                         </div>
-                       </ul>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+
         
-        <div className={cn("pt-8 mb-4 border-t border-slate-100", isCollapsed ? "px-0" : "px-2")}>
+        <div className={cn("pt-4 mt-auto mb-4 border-t border-slate-100", isCollapsed ? "px-0" : "px-2")}>
+          <button 
+            onClick={() => setActiveTab("Profile")}
+            className={cn(
+              "w-full flex items-center py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 mb-2",
+              isCollapsed ? "justify-center px-0" : "px-3",
+              activeTab === "Profile" 
+                ? "text-brand-blue bg-brand-blue/5 shadow-sm" 
+                : "text-slate-500 hover:text-brand-blue hover:bg-slate-50"
+            )}
+            title={isCollapsed ? "Profile" : undefined}
+          >
+            <UserCircle className={cn("w-5 h-5 shrink-0", activeTab === "Profile" ? "text-brand-blue" : "text-slate-400")} />
+            {!isCollapsed && <span className="truncate ml-3">Profile</span>}
+          </button>
+
           <button 
             onClick={onLogout}
             className={cn(
-               "w-full flex items-center py-2 rounded-md text-sm font-bold text-red-500 hover:bg-red-50 transition-colors",
-               isCollapsed ? "justify-center px-0" : "gap-3 px-2"
+               "w-full flex items-center py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 transition-colors",
+               isCollapsed ? "justify-center px-0" : "px-3"
             )}
             title={isCollapsed ? "Sign Out" : undefined}
           >
             <LogOut className="w-5 h-5 shrink-0" />
-            {!isCollapsed && <span>Sign Out</span>}
+            {!isCollapsed && <span className="ml-3">Sign Out</span>}
           </button>
           
           {/* Version */}
