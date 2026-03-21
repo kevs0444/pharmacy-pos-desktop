@@ -30,6 +30,14 @@
 3. **Migrate State:** Swap React's `useState(INVENTORY_DB)` arrays to instead query the embedded database, ensuring 0ms latency local reads.
 4. **Implement Transactions:** Create atomic SQL transactions for POS Checkouts to deduct stock instantly and write to the Sales ledger.
 
+#### Performance Strategy (Designed for 10,000+ Products)
+The UI is already architected for scale. When connecting to the real DB:
+- **Pagination at SQL level:** `SELECT * FROM products LIMIT 20 OFFSET {page * 20}` — never load the full dataset into memory.
+- **Full-Text Search:** Enable `FTS5` virtual table in SQLite for instant name/barcode search across huge catalogs.
+- **Lazy Loading:** POS grid only renders the current page (8 cards). Switching pages triggers a new IPC query.
+- **Indexed columns:** Index `category`, `subCategory`, `name`, `code` for sub-millisecond filter queries.
+- **Navigation:** For POS with 10k+ products, the Category/SubCategory filter is the primary navigation — users should **never need to scroll through all products**. The search bar + filter together narrow to < 20 results in most cases.
+
 ### PHASE 3: Cloud Synchronization & Offline Resilience
 *Goal: Ensure seamless local-first capabilities.*
 
