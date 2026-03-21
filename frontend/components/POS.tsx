@@ -1,24 +1,25 @@
 import { useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, LayoutGrid, List, Pill } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill } from "lucide-react";
 import { cn } from "../lib/utils";
 
-// Sample robust dummy products - no images per client decision to keep DB lightweight
+// TEMPORARY PHASE 1 MOCK DATA (No Backend Yet) - No images per client decision
 const DUMMY_PRODUCTS = [
-  { id: '1', name: 'Amoxicillin 500mg', category: 'Antibiotic', price: 12.50, stock: 150 },
-  { id: '2', name: 'Vitamin C Complex', category: 'Vitamins', price: 8.99, stock: 45 },
-  { id: '3', name: 'Paracetamol 500mg', category: 'Pain Relief', price: 4.50, stock: 320 },
-  { id: '4', name: 'Ibuprofen 400mg', category: 'Pain Relief', price: 6.20, stock: 80 },
-  { id: '5', name: 'First Aid Kit', category: 'Supplies', price: 24.99, stock: 12 },
-  { id: '6', name: 'Cough Syrup', category: 'Cold & Flu', price: 11.25, stock: 0 },
-  { id: '7', name: 'Bandages Pack', category: 'Outer Care', price: 3.49, stock: 200 },
-  { id: '8', name: 'Eye Drops', category: 'Eye Care', price: 9.99, stock: 34 },
+  { id: '1', name: 'Amoxicillin 500mg', category: 'Antibiotic', price: 12.50, stock: 150, salesCount: 120, requiresPrescription: true },
+  { id: '2', name: 'Vitamin C Complex', category: 'Vitamins', price: 8.99, stock: 45, salesCount: 300, requiresPrescription: false },
+  { id: '3', name: 'Paracetamol 500mg', category: 'Pain Relief', price: 4.50, stock: 320, salesCount: 500, requiresPrescription: false },
+  { id: '4', name: 'Ibuprofen 400mg', category: 'Pain Relief', price: 6.20, stock: 80, salesCount: 200, requiresPrescription: false },
+  { id: '5', name: 'First Aid Kit', category: 'Supplies', price: 24.99, stock: 12, salesCount: 15, requiresPrescription: false },
+  { id: '6', name: 'Cough Syrup', category: 'Cold & Flu', price: 11.25, stock: 0, salesCount: 80, requiresPrescription: false },
+  { id: '7', name: 'Bandages Pack', category: 'Outer Care', price: 3.49, stock: 200, salesCount: 150, requiresPrescription: false },
+  { id: '8', name: 'Eye Drops', category: 'Eye Care', price: 9.99, stock: 34, salesCount: 40, requiresPrescription: false },
 ];
 
 export function POS() {
   const [cart, setCart] = useState<{product: typeof DUMMY_PRODUCTS[0], qty: number}[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [showRxOnly, setShowRxOnly] = useState(false);
+  // List view enforced per client Phase 1
 
   const addToCart = (product: typeof DUMMY_PRODUCTS[0]) => {
     setCart(prev => {
@@ -42,6 +43,15 @@ export function POS() {
     }));
   };
 
+  const setExactQty = (id: string, qty: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.product.id === id) {
+        return { ...item, qty: qty };
+      }
+      return item;
+    }));
+  };
+
   const removeFromCart = (id: string) => {
     setCart(prev => prev.filter(item => item.product.id !== id));
   };
@@ -50,26 +60,43 @@ export function POS() {
   const filteredProducts = DUMMY_PRODUCTS.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesRx = showRxOnly ? p.requiresPrescription : true;
+    return matchesSearch && matchesCategory && matchesRx;
   });
 
+  const topSellingProducts = [...DUMMY_PRODUCTS]
+    .sort((a, b) => b.salesCount - a.salesCount)
+    .slice(0, 3);
+
   const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
-  const tax = subtotal * 0.12; // 12% mock tax
-  const total = subtotal + tax;
+  const total = subtotal; // VAT removed per client request
 
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [cashTenderedStr, setCashTenderedStr] = useState("");
-  const [discountType, setDiscountType] = useState<"None" | "Senior" | "PWD">("None");
+  const [discountType, setDiscountType] = useState<"None" | "Senior" | "PWD" | "Custom">("None");
   const [isPaymentSuccess, setIsPaymentSuccess] = useState(false);
 
+  // Form Modals State
+  const [activeModal, setActiveModal] = useState<"None" | "Senior" | "PWD" | "Custom" | "Doctor">("None");
+  const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
+  const [discountInfo, setDiscountInfo] = useState<any>(null);
+  const [doctorInfo, setDoctorInfo] = useState<any>(null);
+
+  // Derived checkouts
+  const needsPrescription = cart.some(item => item.product.requiresPrescription);
+  const isDoctorInfoMissing = needsPrescription && !doctorInfo;
+
   // Checkout Calculations
-  const discountMultiplier = discountType === "None" ? 0 : 0.20; // 20% discount for Senior/PWD
+  const discountMultiplier = discountType === "None" ? 0 : discountType === "Custom" ? (customDiscountPercent / 100) : 0.20; 
   const discountAmount = total * discountMultiplier;
   const finalTotal = total - discountAmount;
   const cashTendered = parseFloat(cashTenderedStr) || 0;
   const change = Math.max(0, cashTendered - finalTotal);
-  const isPayDisabled = cashTendered < finalTotal || cart.length === 0;
+  
+  // Must have doctor info if prescription is needed
+  // Use Math.round to avoid JS floating point precision issues
+  const isPayDisabled = Math.round(cashTendered * 100) < Math.round(finalTotal * 100) || cart.length === 0 || isDoctorInfoMissing;
 
   const handleKeypadPress = (val: string) => {
     if (val === "C") return setCashTenderedStr("");
@@ -100,6 +127,116 @@ export function POS() {
 
   return (
     <div className="h-full w-full bg-slate-50 flex overflow-hidden relative">
+
+      {/* Form Overlay Modals */}
+      {activeModal !== "None" && (
+        <div className="absolute inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-extrabold text-lg text-slate-800">
+                {activeModal === "Senior" ? "Senior Citizen Details" : 
+                 activeModal === "PWD" ? "PWD Details" : 
+                 activeModal === "Custom" ? "Custom Discount Authorization" : 
+                 "Doctor's Prescription Info"}
+              </h3>
+              <button onClick={() => setActiveModal("None")} className="text-slate-400 hover:text-slate-600 transition-colors p-1"><Delete className="w-5 h-5"/></button>
+            </div>
+            
+            <form className="p-6 space-y-4" onSubmit={(e) => {
+               e.preventDefault();
+               const formData = new FormData(e.currentTarget);
+               const data = Object.fromEntries(formData.entries());
+               
+               if (activeModal === "Doctor") {
+                 setDoctorInfo(data);
+               } else {
+                 setDiscountInfo(data);
+                 setDiscountType(activeModal);
+                 if (activeModal === "Custom") {
+                    setCustomDiscountPercent(parseFloat(data.percentage as string) || 0);
+                 }
+               }
+               setActiveModal("None");
+            }}>
+               
+               {activeModal === "Doctor" && (
+                 <>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Doctor's Full Name</label>
+                     <input name="doctorName" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="Dr. Juan Dela Cruz" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PRC License Number</label>
+                     <input name="licenseNumber" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="1234567" />
+                   </div>
+                   <div className="flex gap-4">
+                     <div className="flex-1">
+                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Clinic (Optional)</label>
+                       <input name="clinic" type="text" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="Makati Med" />
+                     </div>
+                     <div className="flex-1">
+                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Prescription Date</label>
+                       <input name="prescriptionDate" type="date" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold text-slate-700" />
+                     </div>
+                   </div>
+                 </>
+               )}
+
+               {(activeModal === "Senior" || activeModal === "PWD") && (
+                 <>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+                     <input name="fullName" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="Juan Dela Cruz" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{activeModal === "Senior" ? "OSCA ID Number" : "PWD ID Number"}</label>
+                     <input name="idNumber" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="ID-12345" />
+                   </div>
+                   <div className="flex gap-4">
+                     <div className="flex-1">
+                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Age</label>
+                       <input name="age" type="number" required={activeModal === "Senior"} min="60" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="65" />
+                     </div>
+                     <div className="flex-1">
+                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Gender</label>
+                       <select name="gender" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold text-slate-700">
+                          <option value="">Select</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                       </select>
+                     </div>
+                   </div>
+                   {activeModal === "PWD" && (
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Disability Type (Optional)</label>
+                       <input name="disabilityType" type="text" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="Visual, Mobility, etc." />
+                     </div>
+                   )}
+                 </>
+               )}
+
+               {activeModal === "Custom" && (
+                 <>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Discount Percentage (%)</label>
+                     <input name="percentage" type="number" min="1" max="100" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="10" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Authorized By / Reason</label>
+                     <input name="authorizedBy" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all font-semibold" placeholder="Manager Jane" />
+                   </div>
+                 </>
+               )}
+
+               <div className="pt-4">
+                 <button type="submit" className="w-full py-3.5 bg-brand-blue text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-brand-blue/20">
+                   {activeModal === "Doctor" ? "Save Doctor Info" : "Apply Discount"}
+                 </button>
+               </div>
+            </form>
+          </div>
+        </div>
+      )}
       
       {/* Checkout Overlay Modal */}
       {isCheckoutOpen && (
@@ -133,7 +270,10 @@ export function POS() {
              <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-slate-50/30">
                 {cart.map(item => (
                    <div key={item.product.id} className="p-4 bg-white border border-slate-100 rounded-xl shadow-sm">
-                      <h4 className="font-bold text-slate-800 leading-tight">{item.product.name}</h4>
+                      <h4 className="font-bold text-slate-800 leading-tight flex items-center gap-2 flex-wrap">
+                        {item.product.name}
+                        {item.product.requiresPrescription && <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[8px] uppercase font-black tracking-wider border border-red-100" title="Prescription Required">Rx Required</span>}
+                      </h4>
                       <div className="flex justify-between items-center text-xs text-slate-500 mt-2 font-semibold">
                          <span className="bg-slate-100 px-2 py-1 rounded-md">Qty: {item.qty}</span>
                          <span>₱{item.product.price.toFixed(2)} / ea</span>
@@ -176,10 +316,10 @@ export function POS() {
                              key={btn}
                              onClick={() => handleKeypadPress(btn)}
                              className={cn(
-                                "h-14 sm:h-16 rounded-2xl text-xl font-bold transition-all border-b-4 active:border-b-0 active:translate-y-1",
-                                btn === 'C' ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100" :
+                                "h-14 sm:h-16 rounded-2xl transition-all border-b-4 active:border-b-0 active:translate-y-1 font-black",
+                                btn === 'C' ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100 text-2xl" :
                                 btn === 'DEL' ? "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 flex items-center justify-center" :
-                                "bg-slate-50 border-slate-200 text-slate-700 hover:bg-brand-light/50 hover:border-brand-blue/30 hover:text-brand-blue"
+                                "bg-white border-slate-200 text-slate-800 text-2xl sm:text-3xl shadow-sm hover:bg-brand-light/30 hover:border-brand-blue/40 hover:text-brand-blue"
                              )}
                            >
                              {btn === 'DEL' ? <Delete className="w-6 h-6" /> : btn}
@@ -203,25 +343,51 @@ export function POS() {
                    
                    {/* Discount Cards */}
                    <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-100">
-                      <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">Discount Type</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                         {['None', 'Senior', 'PWD'].map(type => (
+                      <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex justify-between items-center">
+                        <span>Discount Type</span>
+                        {discountType !== "None" && discountInfo && <span className="text-brand-blue capitalize">{discountInfo.fullName || discountInfo.authorizedBy} applied</span>}
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:gap-3">
+                         {['None', 'Senior', 'PWD', 'Custom'].map(type => (
                             <button 
                               key={type}
-                              onClick={() => setDiscountType(type as any)}
+                              onClick={() => {
+                                if (type === "None") {
+                                  setDiscountType("None");
+                                  setDiscountInfo(null);
+                                  setCustomDiscountPercent(0);
+                                } else {
+                                  setActiveModal(type as any); // Open the modal form first
+                                }
+                              }}
                               className={cn(
-                                 "py-3 px-2 rounded-xl text-sm font-bold transition-all border-2 flex flex-col lg:flex-row items-center justify-center gap-1 min-h-[50px]",
+                                 "py-3 px-2 rounded-xl text-sm font-bold transition-all border-2 flex flex-col items-center justify-center gap-1 min-h-[50px]",
                                  discountType === type 
                                    ? "bg-brand-blue border-brand-blue text-white shadow-md shadow-brand-blue/20" 
                                    : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-300"
                               )}
                             >
                               <span>{type}</span>
-                              {type !== 'None' && <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap", discountType === type ? "bg-white/20 text-white" : "bg-brand-blue/10 text-brand-blue")}>-20%</span>}
+                              {type === 'Senior' && <span className={cn("text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap", discountType === type ? "bg-white/20 text-white" : "bg-brand-blue/10 text-brand-blue")}>20%</span>}
+                              {type === 'PWD' && <span className={cn("text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap", discountType === type ? "bg-white/20 text-white" : "bg-brand-blue/10 text-brand-blue")}>20%</span>}
+                              {type === 'Custom' && discountType === 'Custom' && <span className="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap bg-white/20 text-white">{customDiscountPercent}%</span>}
                             </button>
                          ))}
                       </div>
                    </div>
+
+                   {/* Doctor's Info Alert */}
+                   {needsPrescription && (
+                     <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between transition-colors", doctorInfo ? "bg-emerald-50 border-emerald-200" : "bg-orange-50 border-orange-200")}>
+                        <div>
+                          <p className={cn("text-xs font-black uppercase tracking-widest mb-1", doctorInfo ? "text-emerald-600" : "text-orange-600")}>Restriction</p>
+                          <p className="text-sm font-bold text-slate-700">{doctorInfo ? `Dr. ${doctorInfo.doctorName}` : "Prescription Info Required"}</p>
+                        </div>
+                        <button onClick={() => setActiveModal("Doctor")} className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all border", doctorInfo ? "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-100" : "bg-orange-500 text-white border-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/20")}>
+                           {doctorInfo ? "Edit" : "Input Doctor"}
+                        </button>
+                     </div>
+                   )}
 
                    {/* Receipt Breakdown */}
                    <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
@@ -231,13 +397,9 @@ export function POS() {
                             <span>Subtotal</span>
                             <span>₱{subtotal.toFixed(2)}</span>
                          </div>
-                         <div className="flex justify-between text-slate-500 font-semibold text-sm sm:text-base">
-                            <span>Tax (12% VAT inc.)</span>
-                            <span>₱{tax.toFixed(2)}</span>
-                         </div>
                          {discountAmount > 0 && (
                             <div className="flex justify-between text-red-500 font-bold bg-red-50 p-3 rounded-xl text-xs sm:text-sm">
-                               <span>Discount (20%)</span>
+                               <span>Discount ({discountType === "Custom" ? `${customDiscountPercent}%` : '20%'})</span>
                                <span>- ₱{discountAmount.toFixed(2)}</span>
                             </div>
                          )}
@@ -264,7 +426,7 @@ export function POS() {
                       <button 
                         onClick={handleCompleteSale}
                         disabled={isPayDisabled}
-                        className="w-full py-4 sm:py-5 px-2 bg-brand-green text-white font-black text-lg sm:text-xl rounded-2xl hover:bg-green-600 transition-all disabled:opacity-50 disabled:bg-slate-300 shadow-lg shadow-brand-green/20 disabled:shadow-none translate-y-0 active:translate-y-1 mb-8 md:mb-0 shrink-0 flex items-center justify-center flex-wrap"
+                        className="w-full py-4 sm:py-5 px-2 bg-brand-green text-white font-black text-lg sm:text-xl rounded-2xl hover:bg-green-600 transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-lg shadow-brand-green/20 disabled:shadow-none translate-y-0 active:translate-y-1 mb-8 md:mb-0 shrink-0 flex items-center justify-center flex-wrap"
                       >
                         <span className="mr-2">CONFIRM PAYMENT</span><span>(₱{finalTotal.toFixed(2)})</span>
                       </button>
@@ -314,84 +476,113 @@ export function POS() {
                </button>
             ))}
           </div>
-
-          <div className="hidden md:flex bg-slate-100 p-1 rounded-xl shrink-0 h-[42px] mb-2 self-start border border-slate-200">
-            <button 
-               onClick={() => setViewMode("grid")}
-               className={cn("px-3 rounded-lg flex items-center justify-center transition-all", viewMode === "grid" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
-               title="Card View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button 
-               onClick={() => setViewMode("list")}
-               className={cn("px-3 rounded-lg flex items-center justify-center transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue border border-slate-200/50" : "text-slate-400 hover:text-slate-600")}
-               title="List View"
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
+          <button 
+            onClick={() => setShowRxOnly(!showRxOnly)}
+            className={cn(
+               "px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 border shadow-sm shrink-0",
+               showRxOnly ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-500 hover:bg-slate-50 border-slate-200"
+            )}
+          >
+            {showRxOnly ? "Showing Rx Only" : "Filter Rx Items"}
+          </button>
         </div>
 
-        <div className={cn("flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar content-start", viewMode === "grid" ? "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4" : "flex flex-col gap-3")}>
-          {filteredProducts.map(product => (
-            <div 
-              key={product.id} 
-              onClick={() => product.stock > 0 && addToCart(product)}
-              className={cn(
-                "bg-white rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all group duration-300 active:scale-95 flex overflow-hidden",
-                viewMode === "grid" ? "flex-col" : "flex-row items-center p-3 gap-4",
-                product.stock === 0 && "opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm"
-              )}
-            >
-              {/* Icon Badge instead of Image */}
-              {viewMode === "grid" && (
-                <div className={cn("h-20 flex items-center justify-center relative shrink-0", product.stock === 0 ? "bg-slate-200" : "bg-gradient-to-br from-brand-blue/10 to-brand-green/10")}>
-                  <Pill className={cn("w-8 h-8", product.stock === 0 ? "text-slate-400" : "text-brand-blue/40")} />
-                  {product.stock === 0 && (
-                    <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center">
-                      <span className="text-white text-xs font-black uppercase tracking-wider bg-red-500 px-3 py-1 rounded-full">Out of Stock</span>
+        <div className="flex-1 overflow-y-auto pr-2 pb-10 custom-scrollbar content-start flex flex-col gap-6">
+          
+          {/* Top Selling Section */}
+          {searchQuery === "" && selectedCategory === "All" && (
+            <div>
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                🔥 Top Selling
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-3">
+                {topSellingProducts.map(product => (
+                  <div 
+                    key={`top-${product.id}`} 
+                    onClick={() => product.stock > 0 && addToCart(product)}
+                    className={cn(
+                      "bg-brand-blue/5 rounded-2xl shadow-sm border border-brand-blue/10 cursor-pointer hover:shadow-md hover:bg-brand-blue/10 transition-all group duration-300 active:scale-95 flex flex-col p-4 gap-3 relative overflow-hidden",
+                      product.stock === 0 && "opacity-60 cursor-not-allowed hover:bg-brand-blue/5"
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest">{product.category}</p>
+                          {product.requiresPrescription && <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] uppercase font-black tracking-wider shadow-sm" title="Prescription Required">Rx Required</span>}
+                        </div>
+                        <h3 className="font-extrabold text-brand-blue text-base leading-tight group-hover:text-brand-blue transition-colors line-clamp-1 pr-6">
+                           {product.name}
+                        </h3>
+                        <p className="text-[10px] font-bold text-emerald-600 bg-emerald-100/50 w-fit px-2 py-0.5 rounded-full mt-2 border border-emerald-200/50">
+                          🔥 {product.salesCount} Sold
+                        </p>
+                      </div>
+                      {product.stock === 0 && (
+                        <span className="text-[10px] font-black uppercase bg-red-500 text-white px-2 py-1 rounded-md shrink-0 absolute top-3 right-3 shadow-sm">Out of Stock</span>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
-              {viewMode === "list" && product.stock === 0 && (
-                <span className="text-[8px] font-black uppercase bg-red-500 text-white px-1.5 py-0.5 rounded-full shrink-0">Out</span>
-              )}
-
-              {/* Info */}
-              <div className={cn("flex flex-1", viewMode === "grid" ? "flex-col p-3 md:p-4" : "flex-row items-center justify-between py-1 pr-2")}>
-                
-                <div className={cn(viewMode === "grid" ? "" : "flex flex-col justify-center")}>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{product.category}</p>
-                  <h3 className="font-extrabold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors line-clamp-2">{product.name}</h3>
-                </div>
-                
-                <div className={cn("mt-auto flex", viewMode === "grid" ? "pt-3 items-end justify-between" : "items-center gap-6 md:gap-12")}>
-                  <div>
-                    <p className={cn("font-bold text-slate-400 uppercase", viewMode === "grid" ? "text-[10px]" : "hidden")}>Price</p>
-                    <p className={cn("font-black text-brand-blue leading-none", viewMode === "grid" ? "text-lg" : "text-base")}>₱{product.price.toFixed(2)}</p>
+                    
+                    <div className="mt-auto flex items-end justify-between pt-2">
+                      <div>
+                        <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest mb-0.5">Price</p>
+                        <p className="font-black text-brand-blue text-lg leading-none">₱{product.price.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest mb-0.5">Stock</p>
+                        <p className={cn("font-black leading-none whitespace-nowrap text-sm", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>
+                          {product.stock === 0 ? "0" : `${product.stock}`}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className={cn("text-right", viewMode === "list" && "w-16")}>
-                    <p className={cn("font-bold text-slate-400 uppercase", viewMode === "grid" ? "text-[10px]" : "hidden")}>Stock</p>
-                    <p className={cn("font-black leading-none whitespace-nowrap", viewMode === "grid" ? "text-sm" : "text-xs", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>{product.stock} left</p>
-                  </div>
-                  
-                  {viewMode === "list" && (
-                    <button className="py-2 px-4 bg-brand-green/10 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider shrink-0 pointer-events-none">
-                      Add
-                    </button>
-                  )}
-                </div>
-
-                {viewMode === "grid" && (
-                  <button className="mt-3 w-full py-2 bg-brand-green/10 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider pointer-events-none">
-                    Add to Cart
-                  </button>
-                )}
+                ))}
               </div>
             </div>
-          ))}
+          )}
+
+          {/* All Products List */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">All Products</h3>
+            <div className="flex flex-col gap-2">
+              {filteredProducts.map(product => (
+                <div 
+                  key={product.id} 
+                  onClick={() => product.stock > 0 && addToCart(product)}
+                  className={cn(
+                    "bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group duration-200 active:scale-95 flex flex-row items-center p-3 gap-4",
+                    product.stock === 0 && "opacity-60 cursor-not-allowed hover:translate-y-0 hover:shadow-sm"
+                  )}
+                >
+                  <div className="flex flex-1 flex-row items-center justify-between py-1 pr-2">
+                    <div className="flex flex-col justify-center">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{product.category}</p>
+                        {product.requiresPrescription && <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[8px] uppercase font-black tracking-wider border border-red-100" title="Prescription Required">Rx Required</span>}
+                      </div>
+                      <h3 className="font-extrabold text-slate-800 text-sm leading-tight group-hover:text-brand-blue transition-colors line-clamp-1">
+                         {product.name}
+                      </h3>
+                    </div>
+                    
+                    <div className="flex items-center gap-6 md:gap-12 pl-4">
+                      <div className="w-16">
+                        <p className="font-black text-brand-blue text-base leading-none">₱{product.price.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right w-16">
+                        <p className={cn("font-black leading-none whitespace-nowrap text-xs", product.stock <= 10 ? "text-red-500" : product.stock <= 50 ? "text-yellow-600" : "text-emerald-600")}>
+                          {product.stock === 0 ? "OUT" : `${product.stock} left`}
+                        </p>
+                      </div>
+                      <button className="py-2 px-5 bg-slate-100 text-brand-green text-xs font-black rounded-lg group-hover:bg-brand-green group-hover:text-white transition-all uppercase tracking-wider shrink-0 pointer-events-none border border-slate-200 group-hover:border-transparent">
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           {filteredProducts.length === 0 && (
              <div className="col-span-full h-40 flex flex-col items-center justify-center text-slate-400">
                 <Search className="w-8 h-8 opacity-20 mb-3" />
@@ -428,16 +619,31 @@ export function POS() {
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
                    <div className="flex justify-between items-start">
-                     <h4 className="text-sm font-semibold text-slate-800 leading-tight pr-2">{item.product.name}</h4>
+                     <h4 className="text-sm font-semibold text-slate-800 leading-tight pr-2">
+                       {item.product.name}
+                       {item.product.requiresPrescription && <span className="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[9px] uppercase font-black" title="Prescription Required">Rx</span>}
+                     </h4>
                      <button onClick={() => removeFromCart(item.product.id)} className="text-slate-300 hover:text-red-500 transition-colors shrink-0">
                        <Trash2 className="w-4 h-4" />
                      </button>
                    </div>
                    <div className="flex items-center justify-between mt-2">
                      <span className="text-xs font-bold text-brand-green">₱{(item.product.price * item.qty).toFixed(2)}</span>
-                     <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg p-0.5">
+                     <div className="flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
                        <button onClick={() => updateQty(item.product.id, -1)} className="p-1 hover:bg-white rounded rounded-l-md transition-colors"><Minus className="w-3 h-3 text-slate-500" /></button>
-                       <span className="text-xs font-bold min-w-[1.5rem] text-center">{item.qty}</span>
+                       <input 
+                         type="number" 
+                         value={item.qty === 0 ? '' : item.qty} 
+                         onChange={(e) => {
+                           const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                           setExactQty(item.product.id, isNaN(val) ? 0 : val);
+                         }}
+                         onBlur={() => {
+                           if (!item.qty || item.qty < 1) setExactQty(item.product.id, 1);
+                         }}
+                         className="w-10 text-xs font-bold text-center bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-brand-blue rounded-sm py-0.5 mx-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-colors"
+                         min="1"
+                       />
                        <button onClick={() => updateQty(item.product.id, 1)} className="p-1 hover:bg-white rounded rounded-r-md transition-colors"><Plus className="w-3 h-3 text-slate-500" /></button>
                      </div>
                    </div>
@@ -451,17 +657,10 @@ export function POS() {
         <div className="p-6 bg-slate-50 border-t border-slate-200">
            <div className="space-y-3 mb-6">
              <div className="flex justify-between text-sm text-slate-500">
-               <span>Subtotal</span>
-               <span className="font-bold text-slate-700">₱{subtotal.toFixed(2)}</span>
+               <span>Total Due</span>
+               <span className="font-bold text-slate-700">₱{total.toFixed(2)}</span>
              </div>
-             <div className="flex justify-between text-sm text-slate-500">
-               <span>Tax (12%)</span>
-               <span className="font-bold text-slate-700">₱{tax.toFixed(2)}</span>
-             </div>
-             <div className="flex justify-between text-lg font-extrabold text-slate-900 border-t border-slate-200 pt-3">
-               <span>Total</span>
-               <span>₱{total.toFixed(2)}</span>
-             </div>
+
            </div>
            
            <button 

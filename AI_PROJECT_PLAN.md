@@ -29,10 +29,10 @@ We have shifted the architecture to **Electron** per the client's decision for e
 
 ## 3. Software Development Life Cycle (SDLC) & ROADMAP
 
-### PHASE 1: Client Demo UI (Completed for Presentation)
-*Goal: Provide a fully clickable, high-fidelity prototype to the client so they can visualize the workflow before we connect the database.*
+### PHASE 1: Client Demo UI (Current Focus)
+*Goal: Provide a fully clickable, high-fidelity frontend prototype for showcasing. This phase excludes any backend integration.*
 
-**Status: Highly Matured & Ready for Client Review**
+**Status: In Progress - Refining POS Interface**
 - ✅ **Dynamic Login System:** 3 distinct auth screens (Login, Register, Forgot Password) with smooth transitions, password visibility toggles, and role-based routing (Admin/Manager/Staff).
 - ✅ **Dashboard Overview:** Implementation of beautiful, dynamic charts that react instantly to Timeframe Selections (Daily, Weekly, Monthly, Annually) mapping realistic pharmacy data.
 - ✅ **Inventory & Orders:** Rich data tables showing sample realistic products. Complete workflow for creating purchase orders to Manufacturers (Pfizer, Unilab, etc.) with status tracking.
@@ -40,7 +40,7 @@ We have shifted the architecture to **Electron** per the client's decision for e
 - ✅ **Admin Panel:** Complete employee account viewing and manufacturer tracking with functional "Add New" modals.
 - ✅ **Responsive & Adaptive:** Fully responsive layout with a collapsible sidebar and brand adaptation to **BotikaPlus v1.0.0**.
 
-### PHASE 2: Database & Offline Architecture (Next Focus)
+### PHASE 2: Database & Offline Architecture (Deferred)
 *Goal: Bring the static UI to life by hooking it up to Turso and Local SQLite.*
 
 1. Define the SQL schema (Tables: `Products`, `Categories`, `Sales`, `Sale_Items`, `Users`).
