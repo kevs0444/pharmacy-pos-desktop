@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill, ChevronLeft, ChevronRight, LayoutGrid, List, TriangleAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { INVENTORY_DB, InventoryItem, getNextBatch, daysUntilExpiry } from "../lib/mockData";
+import { INVENTORY_DB, InventoryItem, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
 import { ProductCard, formatStock } from "./ProductCard";
 
 const CARD_PAGE_SIZE = 8;
@@ -23,7 +23,7 @@ export function POS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubCategory, setSelectedSubCategory] = useState("All");
-  const [showRxOnly, setShowRxOnly] = useState(false);
+
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const onToggleSort = () => setSortOrder(prev => prev === "asc" ? "desc" : "asc");
   const [viewMode, setViewMode] = useState<"card" | "list">("card"); // card default for POS
@@ -42,9 +42,12 @@ export function POS() {
   };
 
   const addToCart = (product: InventoryItem, sellByPiece: boolean) => {
-    // FEFO: always pick the earliest-expiring batch with stock
-    const fefo = getNextBatch(product);
-    if (!fefo) return; // No valid batch available
+    // FEFO: always pick the earliest-expiring SELLABLE batch with stock
+    const fefo = getSellableBatches(product)[0];
+    if (!fefo) {
+      alert("⚠️ Cannot sell this product: No valid, unexpired batches available.");
+      return;
+    }
 
     setCart(prev => {
       const existing = prev.find(i => i.product.id === product.id && i.sellByPiece === sellByPiece && i.batchId === fefo.batchId);
@@ -108,10 +111,10 @@ export function POS() {
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
     const matchesCategory = selectedCategory === "All" || selectedCategory === "All Products" || p.category === selectedCategory;
     const matchesSubCategory = !selectedSubCategory || selectedSubCategory === "All" || p.subCategory === selectedSubCategory;
-    const matchesRx = showRxOnly ? p.subCategory === "Prescription (Rx)" : true;
     const isActive = p.isActive !== false; // Disabled products hidden from POS
-    return matchesSearch && matchesCategory && matchesSubCategory && matchesRx && isActive;
-  }), [searchQuery, selectedCategory, selectedSubCategory, showRxOnly]);
+    const hasSellable = getSellableBatches(p).length > 0; // Hide completely if OOS or expired
+    return matchesSearch && matchesCategory && matchesSubCategory && isActive && hasSellable;
+  }), [searchQuery, selectedCategory, selectedSubCategory]);
 
   const sortedFilteredProducts = useMemo(() =>
     [...filteredProducts].sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)),
@@ -123,6 +126,7 @@ export function POS() {
   const pagedProducts = sortedFilteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const topSellingProducts = [...INVENTORY_DB]
+    .filter(p => p.isActive !== false && getSellableBatches(p).length > 0)
     .sort((a, b) => b.salesCount - a.salesCount)
     .slice(0, 4);
 
@@ -471,14 +475,6 @@ export function POS() {
              sortOrder={sortOrder}
              onToggleSort={onToggleSort}
            >
-             <button
-               onClick={() => { setShowRxOnly(!showRxOnly); setCurrentPage(1); }}
-               className={cn("px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 border shadow-sm shrink-0",
-                 showRxOnly ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-500 hover:bg-slate-50 border-slate-200"
-               )}>
-               <Pill className="w-4 h-4" />
-               {showRxOnly ? "Rx Only" : "Show Rx"}
-             </button>
            </ProductCatalogFilter>
         </div>
 
@@ -621,7 +617,7 @@ export function POS() {
           ) : (
             cart.map((item, idx) => {
               const daysLeft = daysUntilExpiry(item.expiryDate);
-              const isNearExpiry = daysLeft >= 0 && daysLeft <= 30;
+              const isNearExpiry = daysLeft >= 0 && daysLeft <= 90;
               return (
                 <div key={idx} className={cn("flex gap-3 bg-white border p-3 rounded-xl shadow-sm", isNearExpiry ? "border-orange-200" : "border-slate-100")}>
                   <div className="w-10 h-10 rounded-lg bg-brand-blue/10 flex items-center justify-center shrink-0">

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Pill, HeartPulse, Baby, Stethoscope, SprayCan, Droplets, ArrowDownAZ, ArrowUpZA } from "lucide-react";
+import { Pill, HeartPulse, Baby, Stethoscope, Droplets, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { cn } from "../lib/utils";
 
 export const categoryGroups = [
@@ -61,7 +60,9 @@ export function ProductCatalogFilter({
    onToggleSort,
    children
 }: ProductCatalogFilterProps) {
-  const [activeGroup, setActiveGroup] = useState<string>("all");
+  const activeGroup = categoryGroups.find(g => 
+    g.name === selectedCategory || (g.id === "all" && (selectedCategory === "All Products" || selectedCategory === "All"))
+  )?.id || "all";
 
   const currentGroup = categoryGroups.find(g => g.id === activeGroup);
 
@@ -74,7 +75,6 @@ export function ProductCatalogFilter({
              <button 
                key={g.id}
                onClick={() => {
-                 setActiveGroup(g.id);
                  onSelectCategory(g.id === "all" ? "All Products" : g.name);
                  if (onSelectSubCategory) onSelectSubCategory("All");
                }}

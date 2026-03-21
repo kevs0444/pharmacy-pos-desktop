@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { INVENTORY_DB, InventoryItem, BrandType, ProductCategory } from "../lib/mockData";
-import { ProductCard, formatStock } from "./ProductCard";
+import { INVENTORY_DB, InventoryItem, BrandType, ProductCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches } from "../lib/mockData";
+import { ProductCard, formatStock, getCategoryIcon } from "./ProductCard";
 
 /* 
  * PERFORMANCE NOTE:
@@ -36,6 +36,9 @@ const emptyForm = () => ({
   sellingPricePerUnit: "",
   sellingPricePerPiece: "",
   discount: "",
+  // Batch fields
+  lotNumber: "",
+  manufacturingDate: "",
   expiryDate: ""
 });
 
@@ -54,6 +57,10 @@ export function Inventory() {
 
   const [formData, setFormData] = useState(emptyForm());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  
+  const [restockFilter, setRestockFilter] = useState<"All" | "Out of Stock" | "Low Stock">("All");
+  const [expiryFilter, setExpiryFilter] = useState<"All" | "expired" | "critical" | "warning">("All");
 
   const handleDelete = (item: InventoryItem) => {
     setItems(prev => prev.filter(i => i.id !== item.id));
@@ -72,6 +79,7 @@ export function Inventory() {
 
   const openEditModal = (item: InventoryItem) => {
     setEditingItem(item);
+    const firstBatch = item.batches[0];
     setFormData({
       code: item.code,
       name: item.name,
@@ -88,7 +96,9 @@ export function Inventory() {
       sellingPricePerUnit: String(item.sellingPricePerUnit),
       sellingPricePerPiece: String(item.sellingPricePerPiece),
       discount: String(item.discount || ""),
-      expiryDate: item.batches[0]?.expiryDate || ""
+      lotNumber: firstBatch?.lotNumber || "",
+      manufacturingDate: firstBatch?.manufacturingDate || "",
+      expiryDate: firstBatch?.expiryDate || ""
     });
     setIsModalOpen(true);
   };
@@ -97,7 +107,7 @@ export function Inventory() {
     if (!formData.name) return;
     const ppu = parseInt(formData.piecesPerUnit) || 1;
     const totalStock = parseInt(formData.totalStockPieces) || 0;
-    const status = totalStock <= 0 ? "Critical" : totalStock <= ppu ? "Moderate" : "Good";
+    const status = totalStock <= 0 ? "Out of Stock" : totalStock <= ppu ? "Low Stock" : "In Stock";
 
     if (editingItem) {
       setItems(prev => prev.map(it => it.id === editingItem.id ? {
@@ -128,8 +138,8 @@ export function Inventory() {
         status, salesCount: 0, isActive: true,
         batches: formData.expiryDate ? [{
           batchId: `B-${Date.now()}`,
-          lotNumber: `LOT-${Date.now()}`,
-          manufacturingDate: new Date().toISOString().split("T")[0],
+          lotNumber: formData.lotNumber || `LOT-${Date.now()}`,
+          manufacturingDate: formData.manufacturingDate || new Date().toISOString().split("T")[0],
           expiryDate: formData.expiryDate,
           stockPieces: totalStock,
           receivedDate: new Date().toISOString().split("T")[0],
@@ -286,12 +296,15 @@ export function Inventory() {
                   </div>
                 </div>
 
-                {/* Pricing & Stock */}
+                {/* Stock & Batch Tracking */}
                 <div className="space-y-4">
                   <h3 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">
-                    <Package className="w-4 h-4 text-brand-green" /> Inventory & Pricing
+                    <Package className="w-4 h-4 text-brand-green" /> Stock & Batch Tracking
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-medium text-amber-700">
+                    📦 <strong>Batch / Lot:</strong> Each delivery should be tracked as a separate batch. Enter the lot number from the manufacturer label, along with the manufacturing and expiry dates. The system uses <strong>FEFO</strong> (First Expired, First Out) to auto-select the correct batch when selling.
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Initial Stock (in {formData.baseUnit}s)</label>
                       <input type="number" value={formData.totalStockPieces} onChange={e => setFormData({...formData, totalStockPieces: e.target.value})} className={inputClass} placeholder={`e.g. 200 ${formData.baseUnit}s`} />
@@ -302,15 +315,46 @@ export function Inventory() {
                       )}
                     </div>
                     <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lot / Batch Number</label>
+                      <input type="text" value={formData.lotNumber} onChange={e => setFormData({...formData, lotNumber: e.target.value})} className={cn(inputClass, "font-mono")} placeholder="e.g. LOT-2026-AMX-01" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-red-400 uppercase tracking-wider">Manufacturing Date *</label>
+                      <input type="date" value={formData.manufacturingDate} onChange={e => setFormData({...formData, manufacturingDate: e.target.value})} className={cn(inputClass, "text-slate-700 font-medium")} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-red-400 uppercase tracking-wider">Expiry Date *</label>
+                      <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className={cn(inputClass, "text-slate-700 font-medium")} />
+                      {formData.expiryDate && (() => {
+                        const d = daysUntilExpiry(formData.expiryDate);
+                        return (
+                          <p className={cn("text-[10px] font-bold",
+                            d < 0 ? "text-red-500" : d <= 90 ? "text-red-500" : d <= 365 ? "text-orange-500" : "text-emerald-600"
+                          )}>
+                            {d < 0 ? `⚠️ Expired ${Math.abs(d)} days ago` : d <= 90 ? `🔴 ${d} days left (critical)` : d <= 365 ? `🟠 ${Math.floor(d/30)} months left` : `🟢 ${Math.floor(d/365)}yr ${Math.floor((d%365)/30)}mo left (safe)`}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="space-y-4">
+                  <h3 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-widest border-b border-slate-100 pb-2">
+                    <Pill className="w-4 h-4 text-brand-blue" /> Pricing & SRP
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cost Price per {formData.packagingUnit} (₱)</label>
                       <input type="number" step="0.01" value={formData.unitPriceCost} onChange={e => setFormData({...formData, unitPriceCost: e.target.value})} className={inputClass} placeholder="0.00" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selling Price per {formData.packagingUnit} (₱)</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">SRP per {formData.packagingUnit} (₱)</label>
                       <input type="number" step="0.01" value={formData.sellingPricePerUnit} onChange={e => setFormData({...formData, sellingPricePerUnit: e.target.value})} className={inputClass} placeholder="0.00" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selling Price per {formData.baseUnit} (₱)</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">SRP per {formData.baseUnit} (₱)</label>
                       <input type="number" step="0.01" value={formData.sellingPricePerPiece} onChange={e => setFormData({...formData, sellingPricePerPiece: e.target.value})} className={inputClass} placeholder={suggestedPricePerPiece || "0.00"} />
                       {suggestedPricePerPiece && !formData.sellingPricePerPiece && (
                         <button type="button" onClick={() => setFormData({...formData, sellingPricePerPiece: suggestedPricePerPiece})} className="text-[10px] text-brand-blue font-bold hover:underline">
@@ -321,10 +365,6 @@ export function Inventory() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Discount % (Optional)</label>
                       <input type="number" min="0" max="100" step="1" value={formData.discount} onChange={e => setFormData({...formData, discount: e.target.value})} className={inputClass} placeholder="e.g. 10" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expiration Date</label>
-                      <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className={cn(inputClass, "text-slate-700 font-medium")} />
                     </div>
                   </div>
                 </div>
@@ -398,6 +438,121 @@ export function Inventory() {
            onToggleSort={onToggleSort}
         />
 
+        {/* Inventory Alerts Widget */}
+        {(() => {
+          let lowStock = items.filter(i => i.status === "Out of Stock" || i.status === "Low Stock");
+          const lowStockTotal = lowStock.length;
+          if (restockFilter !== "All") lowStock = lowStock.filter(i => i.status === restockFilter);
+
+          let expiringSoon = items.filter(i => {
+            const exp = getExpiryStatus(i);
+            return exp === "expired" || exp === "critical" || exp === "warning";
+          });
+          const expiringTotal = expiringSoon.length;
+          if (expiryFilter !== "All") {
+            expiringSoon = expiringSoon.filter(i => getExpiryStatus(i) === expiryFilter.toLowerCase());
+          }
+          
+          if (lowStockTotal === 0 && expiringTotal === 0) return null;
+          
+          return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
+              {/* Low Stock */}
+              {(lowStockTotal > 0 || restockFilter !== "All") && (
+                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[280px]">
+                  <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
+                    <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
+                      <div className="flex items-center gap-2"><Package className="w-4 h-4 text-orange-500" /> Needed to Restock</div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                          <button onClick={() => setRestockFilter("All")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "All" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>All</button>
+                          <button onClick={() => setRestockFilter("Out of Stock")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "Out of Stock" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Out</button>
+                          <button onClick={() => setRestockFilter("Low Stock")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "Low Stock" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Low</button>
+                        </div>
+                        <span className="bg-slate-100 text-slate-500 font-bold py-0.5 px-2 rounded-full text-[10px]">{lowStock.length}</span>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="divide-y divide-slate-100">
+                      {lowStock.map(item => {
+                        const Icon = getCategoryIcon(item.category);
+                        return (
+                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="w-10 h-10 shrink-0 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform">
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div className="overflow-hidden">
+                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{item.genericName || item.manufacturer}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <p className="font-black text-orange-600 text-sm tracking-tight">{item.totalStockPieces} left</p>
+                              <p className="text-[9px] font-extrabold text-orange-400 uppercase tracking-widest leading-none mt-0.5">{item.status}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Expiring Soon */}
+              {(expiringTotal > 0 || expiryFilter !== "All") && (
+                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[280px]">
+                  <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
+                    <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
+                      <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500" /> Expiring Soon / Expired</div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                          <button onClick={() => setExpiryFilter("All")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "All" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>All</button>
+                          <button onClick={() => setExpiryFilter("expired")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "expired" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Expired</button>
+                          <button onClick={() => setExpiryFilter("critical")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "critical" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤3 mo</button>
+                          <button onClick={() => setExpiryFilter("warning")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "warning" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤6 mo</button>
+                        </div>
+                        <span className="bg-slate-100 text-slate-500 font-bold py-0.5 px-2 rounded-full text-[10px]">{expiringSoon.length}</span>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="divide-y divide-slate-100">
+                      {expiringSoon.map(item => {
+                        const Icon = getCategoryIcon(item.category);
+                        const expStatus = getExpiryStatus(item);
+                        const isExpired = expStatus === "expired";
+                        return (
+                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className={cn("w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform", isExpired ? "bg-red-50 border-red-200 text-red-600" : "bg-orange-50 border-orange-100 text-orange-500")}>
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div className="overflow-hidden">
+                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{item.genericName || item.manufacturer}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <p className={cn("font-black text-sm tracking-tight", isExpired ? "text-red-600" : "text-orange-500")}>
+                                {isExpired ? "EXPIRED" : `${daysUntilExpiry(getNextBatch(item)?.expiryDate || "")}d left`}
+                              </p>
+                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", isExpired ? "text-red-400" : "text-orange-400")}>
+                                {isExpired ? "Pull from shelf" : "Warning"}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          );
+        })()}
+
         <Card className="border-t-4 border-t-brand-teal overflow-hidden">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-3">
             <CardTitle className="text-lg md:text-xl font-bold text-slate-800">
@@ -432,83 +587,215 @@ export function Inventory() {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-black tracking-wider">
                     <tr>
-                      <th className="px-4 py-4">SKU</th>
                       <th className="px-4 py-4">Product</th>
-                      <th className="px-4 py-4">Category</th>
+                      <th className="px-4 py-4">Expiry / Mfg</th>
+                      <th className="px-4 py-4">SRP</th>
                       <th className="px-4 py-4">Stock</th>
-                      <th className="px-4 py-4">Cost / {'{'}pack{'}'}</th>
-                      <th className="px-4 py-4">Sell / Pack</th>
-                      <th className="px-4 py-4">Sell / Piece</th>
-                      <th className="px-4 py-4">Margin</th>
-                      <th className="px-4 py-4">Status</th>
+                      <th className="px-4 py-4">Stock Status</th>
+                      <th className="px-4 py-4">Expiry Status</th>
                       <th className="px-4 py-4 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {pagedItems.map(item => {
                       const stockInfo = formatStock(item);
+                      const expiryStatus = getExpiryStatus(item);
+                      const nextBatch = getNextBatch(item);
+                      const daysLeft = nextBatch ? daysUntilExpiry(nextBatch.expiryDate) : null;
+                      const isExpanded = expandedItemId === item.id;
                       const effectiveSelling = item.discount ? item.sellingPricePerUnit * (1 - item.discount/100) : item.sellingPricePerUnit;
                       const margin = effectiveSelling - item.unitPriceCost;
+
+                      // Row border color based on expiry
+                      const rowBorderClass = expiryStatus === "expired" || expiryStatus === "critical"
+                        ? "border-l-4 border-l-red-400"
+                        : expiryStatus === "warning"
+                        ? "border-l-4 border-l-orange-300"
+                        : expiryStatus === "good"
+                        ? "border-l-4 border-l-emerald-300"
+                        : "border-l-4 border-l-transparent";
+
                       return (
-                        <tr key={item.id} className={cn("transition-colors group", !item.isActive ? "opacity-50 bg-slate-50" : "hover:bg-slate-50/80")}>
-                          <td className="px-4 py-3 font-mono text-slate-400 text-xs">{item.code}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div>
-                                <p className="font-bold text-brand-blue group-hover:text-brand-green transition-colors">{item.name}</p>
-                                <p className="text-[11px] text-slate-400 font-medium">{item.genericName}</p>
+                        <>
+                          <tr key={item.id}
+                            onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
+                            className={cn(
+                              "transition-colors group cursor-pointer",
+                              rowBorderClass,
+                              !item.isActive ? "opacity-50 bg-slate-50" : "hover:bg-slate-50/80",
+                              isExpanded && "bg-brand-blue/[0.03]"
+                            )}>
+                            {/* Product */}
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <p className="font-bold text-brand-blue group-hover:text-brand-green transition-colors">{item.name}</p>
+                                  <p className="text-[11px] text-slate-400 font-medium">{item.genericName}</p>
+                                </div>
+                                {!item.isActive && (
+                                  <span className="px-2 py-0.5 text-[9px] font-black text-slate-400 bg-slate-200 rounded uppercase tracking-widest">Disabled</span>
+                                )}
                               </div>
-                              {!item.isActive && (
-                                <span className="px-2 py-0.5 text-[9px] font-black text-slate-400 bg-slate-200 rounded uppercase tracking-widest">Disabled</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="font-mono text-[10px] text-slate-300">{item.code}</span>
+                                <span className="text-slate-200">·</span>
+                                <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider", item.subCategory === "Prescription (Rx)" ? "bg-red-50 text-red-500 border border-red-100" : "bg-emerald-50 text-emerald-600 border border-emerald-100")}>
+                                  {item.subCategory === "Prescription (Rx)" ? "Rx" : "OTC"}
+                                </span>
+                                <span className="text-[9px] text-slate-300 font-bold uppercase">{item.brandType}</span>
+                              </div>
+                            </td>
+                            {/* Expiry / Mfg */}
+                            <td className="px-4 py-3">
+                              {nextBatch ? (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase w-9">Exp</span>
+                                    <span className={cn("text-xs font-bold",
+                                      expiryStatus === "expired" || expiryStatus === "critical" ? "text-red-500" :
+                                      expiryStatus === "warning" ? "text-orange-500" : "text-emerald-600"
+                                    )}>
+                                      {nextBatch.expiryDate}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase w-9">Mfg</span>
+                                    <span className="text-xs text-slate-400 font-medium">{nextBatch.manufacturingDate}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-slate-300 italic">No batches</span>
                               )}
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className={cn("text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider", item.subCategory === "Prescription (Rx)" ? "bg-red-50 text-red-500 border border-red-100" : "bg-emerald-50 text-emerald-600 border border-emerald-100")}>
-                                {item.subCategory === "Prescription (Rx)" ? "Rx" : "OTC"}
+                            </td>
+                            {/* SRP */}
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-bold text-brand-blue text-sm">₱{effectiveSelling.toFixed(2)}<span className="text-[10px] text-slate-300 font-medium">/{item.packagingUnit}</span></p>
+                                {item.piecesPerUnit > 1 && (
+                                  <p className="text-[11px] text-slate-400 font-medium">₱{item.sellingPricePerPiece.toFixed(2)}/{item.baseUnit}</p>
+                                )}
+                                {item.discount && <p className="text-[10px] text-red-400 font-bold">-{item.discount}% off</p>}
+                              </div>
+                            </td>
+                            {/* Stock */}
+                            <td className="px-4 py-3">
+                              <span className={cn("font-bold text-xs", stockInfo.isOut ? "text-red-500" : stockInfo.isLow ? "text-orange-500" : "text-slate-700")}>
+                                {stockInfo.label}
                               </span>
-                              <span className="text-[9px] text-slate-300 font-bold uppercase">{item.brandType}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="bg-slate-100 px-2.5 py-1 rounded-md text-slate-600 text-xs font-bold uppercase tracking-wider">{item.category}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={cn("font-bold text-xs", stockInfo.isOut ? "text-red-500" : stockInfo.isLow ? "text-orange-500" : "text-slate-700")}>
-                              {stockInfo.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-slate-500 text-xs">₱{item.unitPriceCost.toFixed(2)}</td>
-                          <td className="px-4 py-3 font-bold text-brand-blue text-xs">
-                            ₱{effectiveSelling.toFixed(2)}
-                            {item.discount && <span className="block text-[10px] text-slate-300 line-through">₱{item.sellingPricePerUnit.toFixed(2)}</span>}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-500 font-semibold">₱{item.sellingPricePerPiece.toFixed(2)}<span className="text-slate-300">/{item.baseUnit}</span></td>
-                          <td className="px-4 py-3">
-                            <span className={cn("text-xs font-bold px-2 py-1 rounded-md", margin >= 0 ? "text-emerald-600 bg-emerald-50" : "text-red-500 bg-red-50")}>
-                              {margin >= 0 ? "+" : ""}₱{margin.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={cn("px-3 py-1 rounded-full text-xs font-bold",
-                              item.status === 'Good' ? 'bg-emerald-100 text-emerald-700' :
-                              item.status === 'Moderate' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            )}>{item.status}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center gap-1">
-                              <button onClick={() => openEditModal(item)} className="p-1.5 text-slate-400 hover:text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-all" title="Edit">
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleToggleActive(item)} className={cn("p-1.5 rounded-lg transition-all", item.isActive ? "text-slate-300 hover:text-orange-500 hover:bg-orange-50" : "text-orange-500 bg-orange-50 hover:bg-orange-100")} title={item.isActive ? "Disable product" : "Enable product"}>
-                                <Package className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => setDeleteConfirmItem(item)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Delete">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            {/* Stock Status */}
+                            <td className="px-4 py-3">
+                              <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                item.status === 'In Stock' ? 'bg-emerald-100 text-emerald-700' :
+                                item.status === 'Low Stock' ? 'bg-orange-100 text-orange-700' :
+                                'bg-red-100 text-red-700'
+                              )}>{item.status}</span>
+                            </td>
+                            {/* Expiry Status */}
+                            <td className="px-4 py-3">
+                              {expiryStatus === "expired" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-700">Expired</span>
+                              ) : expiryStatus === "critical" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-600">{daysLeft}d left</span>
+                              ) : expiryStatus === "warning" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-600">{daysLeft !== null ? `${Math.floor(daysLeft / 30)}mo` : ""}</span>
+                              ) : expiryStatus === "good" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">Safe</span>
+                              ) : (
+                                <span className="text-xs text-slate-300">—</span>
+                              )}
+                            </td>
+                            {/* Actions */}
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => openEditModal(item)} className="p-1.5 text-slate-400 hover:text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-all" title="Edit">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => handleToggleActive(item)} className={cn("p-1.5 rounded-lg transition-all", item.isActive ? "text-slate-300 hover:text-orange-500 hover:bg-orange-50" : "text-orange-500 bg-orange-50 hover:bg-orange-100")} title={item.isActive ? "Disable product" : "Enable product"}>
+                                  <Package className="w-3.5 h-3.5" />
+                                </button>
+                                <button onClick={() => setDeleteConfirmItem(item)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Delete">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Expandable Detail Row */}
+                          {isExpanded && (
+                            <tr key={`detail-${item.id}`} className="bg-slate-50/70">
+                              <td colSpan={7} className="px-6 py-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                  {/* Pricing Breakdown */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Pricing</h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-slate-400">Cost / {item.packagingUnit}</span><span className="font-bold text-slate-600">₱{item.unitPriceCost.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">SRP / {item.packagingUnit}</span><span className="font-bold text-brand-blue">₱{item.sellingPricePerUnit.toFixed(2)}</span></div>
+                                      {item.piecesPerUnit > 1 && (
+                                        <div className="flex justify-between"><span className="text-slate-400">SRP / {item.baseUnit}</span><span className="font-bold text-slate-600">₱{item.sellingPricePerPiece.toFixed(2)}</span></div>
+                                      )}
+                                      {item.discount && (
+                                        <div className="flex justify-between"><span className="text-slate-400">Discount</span><span className="font-bold text-red-500">-{item.discount}%</span></div>
+                                      )}
+                                      <div className="flex justify-between border-t border-slate-100 pt-2">
+                                        <span className="text-slate-400 font-bold">Margin / {item.packagingUnit}</span>
+                                        <span className={cn("font-black", margin >= 0 ? "text-emerald-600" : "text-red-500")}>
+                                          {margin >= 0 ? "+" : ""}₱{margin.toFixed(2)} ({((margin / item.unitPriceCost) * 100).toFixed(1)}%)
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Product Info */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Product Info</h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-slate-400">Category</span><span className="font-bold text-slate-600">{item.category}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">SubCategory</span><span className="font-bold text-slate-600">{item.subCategory}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Manufacturer</span><span className="font-bold text-slate-600">{item.manufacturer || "—"}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Packaging</span><span className="font-bold text-slate-600">{item.piecesPerUnit} {item.baseUnit}s / {item.packagingUnit}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Total Sales</span><span className="font-bold text-slate-600">{item.salesCount.toLocaleString()}</span></div>
+                                    </div>
+                                  </div>
+
+                                  {/* Batch Breakdown */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Batch Breakdown ({getActiveBatches(item).length} active)</h4>
+                                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                      {item.batches.length > 0 ? item.batches.map(batch => {
+                                        const bDays = daysUntilExpiry(batch.expiryDate);
+                                        return (
+                                          <div key={batch.batchId} className={cn("flex items-center justify-between text-xs p-2 rounded-lg border",
+                                            bDays < 0 ? "bg-red-50 border-red-100" :
+                                            bDays <= 90 ? "bg-red-50/50 border-red-100" :
+                                            bDays <= 365 ? "bg-orange-50/50 border-orange-100" :
+                                            "bg-emerald-50/30 border-emerald-100"
+                                          )}>
+                                            <div>
+                                              <p className="font-bold text-slate-700">{batch.lotNumber}</p>
+                                              <p className="text-[10px] text-slate-400">Mfg: {batch.manufacturingDate} · Exp: {batch.expiryDate}</p>
+                                            </div>
+                                            <div className="text-right">
+                                              <p className="font-bold text-slate-700">{batch.stockPieces} pcs</p>
+                                              <p className={cn("text-[10px] font-bold",
+                                                bDays < 0 ? "text-red-500" : bDays <= 90 ? "text-red-500" : bDays <= 365 ? "text-orange-500" : "text-emerald-600"
+                                              )}>
+                                                {bDays < 0 ? "EXPIRED" : `${bDays}d left`}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        );
+                                      }) : (
+                                        <p className="text-xs text-slate-300 italic">No batches recorded</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       );
                     })}
                   </tbody>

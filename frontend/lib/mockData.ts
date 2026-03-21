@@ -68,7 +68,7 @@ export interface InventoryItem {
   // Availability
   isActive: boolean;            // false = hidden from POS, visible in Inventory as "Disabled"
 
-  status: string;               // Derived: "Good" | "Moderate" | "Critical"
+  status: string;               // Derived: "In Stock" | "Low Stock" | "Out of Stock"
   salesCount: number;
 }
 
@@ -88,14 +88,19 @@ export function daysUntilExpiry(expiryDate: string): number {
   return Math.floor((exp - now) / (1000 * 60 * 60 * 24));
 }
 
-/** Active batches with stock > 0, sorted by expiryDate ASC (FEFO order). */
+/** Active batches with stock > 0, sorted by expiryDate ASC. */
 export function getActiveBatches(item: InventoryItem): ProductBatch[] {
   return [...item.batches]
     .filter(b => b.stockPieces > 0)
     .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
 }
 
-/** The batch to sell from next — earliest expiry with stock (FEFO). */
+/** Sellable batches (active AND not expired), sorted by expiryDate ASC (FEFO). */
+export function getSellableBatches(item: InventoryItem): ProductBatch[] {
+  return getActiveBatches(item).filter(b => daysUntilExpiry(b.expiryDate) >= 0);
+}
+
+/** The batch to show expiry for — earliest active batch (could be expired). */
 export function getNextBatch(item: InventoryItem): ProductBatch | null {
   return getActiveBatches(item)[0] ?? null;
 }
@@ -105,15 +110,16 @@ export function getNearExpiryBatches(item: InventoryItem, days = 90): ProductBat
   return getActiveBatches(item).filter(b => daysUntilExpiry(b.expiryDate) <= days);
 }
 
-/** Classify expiry urgency from earliest active batch. */
-export function getExpiryStatus(item: InventoryItem): "expired" | "critical" | "warning" | "ok" | "none" {
+/** Classify expiry urgency from earliest active batch.
+ *  Client thresholds: Red ≤3 months, Orange 3mo–6mo, Green >6mo */
+export function getExpiryStatus(item: InventoryItem): "expired" | "critical" | "warning" | "good" | "none" {
   const next = getNextBatch(item);
   if (!next) return "none";
   const d = daysUntilExpiry(next.expiryDate);
-  if (d < 0)   return "expired";
-  if (d <= 30)  return "critical";
-  if (d <= 90)  return "warning";
-  return "ok";
+  if (d < 0)    return "expired";   // Already expired
+  if (d <= 90)  return "critical";  // Red — 3 months or less
+  if (d <= 180) return "warning";   // Orange — 6 months or less
+  return "good";                    // Green — more than 6 months
 }
 
 /**
@@ -121,11 +127,11 @@ export function getExpiryStatus(item: InventoryItem): "expired" | "critical" | "
  * Returns updated batches array after deducting `pieces` using FEFO.
  */
 export function deductFEFO(item: InventoryItem, pieces: number): ProductBatch[] {
-  const sorted = getActiveBatches(item);
+  const sortedSellable = getSellableBatches(item);
   let remaining = pieces;
   const updated = item.batches.map(b => ({ ...b }));
 
-  for (const batch of sorted) {
+  for (const batch of sortedSellable) {
     if (remaining <= 0) break;
     const target = updated.find(b => b.batchId === batch.batchId)!;
     const deduct = Math.min(target.stockPieces, remaining);
@@ -158,7 +164,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 550.00,
     sellingPricePerPiece: 6.00,
     salesCount: 1450,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "AMX-B001", lotNumber: "LOT-2024-AMX-01", manufacturingDate: "2024-02-01", expiryDate: "2026-02-28", stockPieces: 15, receivedDate: "2024-02-10" },
@@ -184,7 +190,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerPiece: 4.00,
     discount: 10,
     salesCount: 890,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "VTC-B001", lotNumber: "VTC-LOT-2025-01", manufacturingDate: "2025-01-10", expiryDate: "2027-01-09", stockPieces: 250, receivedDate: "2025-01-15" },
@@ -208,7 +214,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 250.00,
     sellingPricePerPiece: 3.00,
     salesCount: 2100,
-    status: "Critical",
+    status: "Out of Stock",
     isActive: true,
     batches: [
       // Only partial batch left — near expiry
@@ -232,7 +238,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 180.00,
     sellingPricePerPiece: 5.00,
     salesCount: 1200,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "CTZ-B001", lotNumber: "CTZ-2025-01", manufacturingDate: "2025-02-01", expiryDate: "2027-01-31", stockPieces: 150, receivedDate: "2025-02-10" },
@@ -256,7 +262,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 220.00,
     sellingPricePerPiece: 220.00,
     salesCount: 450,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "SNS-B001", lotNumber: "SNS-2025-01", manufacturingDate: "2025-03-01", expiryDate: "2027-02-28", stockPieces: 26, receivedDate: "2025-03-10" },
@@ -279,7 +285,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 180.00,
     sellingPricePerPiece: 180.00,
     salesCount: 520,
-    status: "Moderate",
+    status: "Low Stock",
     isActive: true,
     batches: [
       { batchId: "CSY-B001", lotNumber: "CSY-2026-01", manufacturingDate: "2026-01-01", expiryDate: "2026-06-30", stockPieces: 8, receivedDate: "2026-01-05" }, // ⚠️ Near expiry!
@@ -304,7 +310,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerPiece: 10.00,
     discount: 20,
     salesCount: 670,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "CAL-B001", lotNumber: "CAL-2025-01", manufacturingDate: "2025-01-01", expiryDate: "2027-12-31", stockPieces: 180, receivedDate: "2025-01-10" },
@@ -327,7 +333,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 800.00,
     sellingPricePerPiece: 10.00,
     salesCount: 950,
-    status: "Moderate",
+    status: "Low Stock",
     isActive: true,
     batches: [
       { batchId: "LST-B001", lotNumber: "LST-2025-01", manufacturingDate: "2025-03-01", expiryDate: "2027-02-28", stockPieces: 15, receivedDate: "2025-03-05" },
@@ -351,7 +357,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 250.00,
     sellingPricePerPiece: 250.00,
     salesCount: 150,
-    status: "Moderate",
+    status: "Low Stock",
     isActive: true,
     batches: [
       { batchId: "THM-B001", lotNumber: "THM-2025-01", manufacturingDate: "2025-01-01", expiryDate: "2030-01-01", stockPieces: 12, receivedDate: "2025-01-15" },
@@ -374,7 +380,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 320.00,
     sellingPricePerPiece: 320.00,
     salesCount: 310,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "KTO-B001", lotNumber: "KTO-2025-01", manufacturingDate: "2025-02-01", expiryDate: "2027-01-31", stockPieces: 45, receivedDate: "2025-02-05" },
@@ -397,7 +403,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 85.00,
     sellingPricePerPiece: 85.00,
     salesCount: 880,
-    status: "Good",
+    status: "In Stock",
     isActive: true,
     batches: [
       { batchId: "BWP-B001", lotNumber: "BWP-2025-01", manufacturingDate: "2025-04-01", expiryDate: "2027-03-31", stockPieces: 110, receivedDate: "2025-04-10" },
@@ -420,7 +426,7 @@ export const INVENTORY_DB: InventoryItem[] = [
     sellingPricePerUnit: 400.00,
     sellingPricePerPiece: 5.00,
     salesCount: 1800,
-    status: "Moderate",
+    status: "Low Stock",
     isActive: true,
     batches: [
       { batchId: "IBU-B001", lotNumber: "IBU-2025-01", manufacturingDate: "2025-05-01", expiryDate: "2027-04-30", stockPieces: 50, receivedDate: "2025-05-05" },

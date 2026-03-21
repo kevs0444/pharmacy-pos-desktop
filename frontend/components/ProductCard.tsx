@@ -3,7 +3,7 @@ import {
   ChevronRight, TriangleAlert, Plus, Baby, Droplets, Package, AlertOctagon
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { InventoryItem, getNextBatch, getExpiryStatus, daysUntilExpiry } from "../lib/mockData";
+import { InventoryItem, getNextBatch, getExpiryStatus, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
 
 // ─── Category Icon ──────────────────────────────────────────────────────────
 export function getCategoryIcon(category: string) {
@@ -42,6 +42,7 @@ export function formatStock(item: InventoryItem): { label: string; isLow: boolea
 }
 
 // ─── Expiry Badge ─────────────────────────────────────────────────────────────
+/** Client thresholds: Red ≤3mo, Orange 3mo–1yr, Green 1yr+ */
 function ExpiryBadge({ item }: { item: InventoryItem }) {
   const batch  = getNextBatch(item);
   const status = getExpiryStatus(item);
@@ -56,7 +57,7 @@ function ExpiryBadge({ item }: { item: InventoryItem }) {
   );
   if (status === "critical") return (
     <span className="flex items-center gap-1 text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-md border border-red-200 uppercase tracking-wider">
-      <TriangleAlert className="w-2.5 h-2.5" /> Exp {days}d
+      <TriangleAlert className="w-2.5 h-2.5" /> {days}d left
     </span>
   );
   if (status === "warning") return (
@@ -64,8 +65,9 @@ function ExpiryBadge({ item }: { item: InventoryItem }) {
       Exp {batch.expiryDate.slice(0, 7)}
     </span>
   );
+  // "good" — 1+ year remaining, green
   return (
-    <span className="text-[9px] font-medium text-slate-300">
+    <span className="flex items-center gap-1 text-[9px] font-medium text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
       Exp {batch.expiryDate.slice(0, 7)}
     </span>
   );
@@ -74,7 +76,7 @@ function ExpiryBadge({ item }: { item: InventoryItem }) {
 // ─── ProductCard ──────────────────────────────────────────────────────────────
 interface ProductCardProps {
   product: InventoryItem;
-  viewMode: "pos" | "inventory";
+  viewMode: "pos" | "inventory" | "grid";
   onAction?: (product: InventoryItem) => void;
   disabled?: boolean;
 }
@@ -85,6 +87,9 @@ export function ProductCard({ product, viewMode, onAction, disabled }: ProductCa
   const isRx      = product.subCategory === "Prescription (Rx)";
   const expiryStatus = getExpiryStatus(product);
   const isOutOfStock = stockInfo.isOut;
+
+  // Fully block selection in POS if no unexpired batches are available
+  const isExpiredUnsellable = viewMode === "pos" && getSellableBatches(product).length === 0;
 
   const displayPrice = product.discount
     ? product.sellingPricePerUnit * (1 - product.discount / 100)
@@ -99,8 +104,10 @@ export function ProductCard({ product, viewMode, onAction, disabled }: ProductCa
         ? "border-red-200"
         : expiryStatus === "warning"
         ? "border-orange-200"
+        : expiryStatus === "good"
+        ? "border-emerald-100"
         : "border-slate-100",
-      (disabled || isOutOfStock) ? "opacity-60 grayscale-[0.5] pointer-events-none" : ""
+      (disabled || isOutOfStock || isExpiredUnsellable) ? "opacity-60 grayscale-[0.5] pointer-events-none" : ""
     )}>
 
       {/* Top: Icon + Badges */}
