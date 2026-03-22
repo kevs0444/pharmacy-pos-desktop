@@ -1,11 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
-import {
-  Clock, CheckCircle, Package, Truck, Search, Building2, AlertCircle,
-  Plus, X, Save, LayoutGrid, List, ChevronLeft, ChevronRight,
-  User, Filter, Calendar, ArrowDownAZ, ArrowUpZA
-} from "lucide-react";
+import { Clock, CheckCircle, Package, Truck, Search, Building2, AlertCircle, Plus, X, Save, LayoutGrid, List, ChevronLeft, ChevronRight, User, Filter, Calendar, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { cn } from "../lib/utils";
+import { mapPurchaseOrderRecordToPurchaseOrder } from "../lib/mappers";
 
 // ─────────────────────────────────────────────────────
 // Types & Mock Data
@@ -30,17 +27,6 @@ interface PurchaseOrder {
 const MOCK_STAFF = ["Admin", "Jane Reyes", "Mark Santos", "Liza Cruz", "Ben Alvarez"];
 const MOCK_MANUFACTURERS = ["Unilab", "Pfizer", "TGP Generics", "GSK", "Bayer", "Unilever", "PharmaTech", "MedCorp"];
 
-const initialOrders: PurchaseOrder[] = [
-  { id: "PO-2026-0048", manufacturer: "Unilab", items: ["Biogesic 500mg (10 boxes)", "Neozep Forte (5 boxes)"], total: 4200, status: "In Transit", eta: "Mar 22", placed: "Mar 18", priority: "Normal", orderedBy: "Jane Reyes", contactPerson: "Mr. Cruz" },
-  { id: "PO-2026-0047", manufacturer: "Pfizer", items: ["Amoxicillin 500mg (20 boxes)"], total: 8500, status: "Processing", eta: "Mar 25", placed: "Mar 19", priority: "Normal", orderedBy: "Admin", contactPerson: "Ms. Tan", remarks: "Awaiting stock replenishment from Pfizer warehouse." },
-  { id: "PO-2026-0046", manufacturer: "TGP Generics", items: ["Paracetamol 500mg (50 boxes)", "Ibuprofen 400mg (30 boxes)", "Mefenamic Acid (20 boxes)"], total: 12400, status: "In Transit", eta: "Mar 21", placed: "Mar 16", priority: "Urgent", orderedBy: "Mark Santos", contactPerson: "Mr. Garcia" },
-  { id: "PO-2026-0045", manufacturer: "GSK", items: ["Cetirizine 10mg (15 boxes)"], total: 3200, status: "Delivered", eta: "Mar 18", placed: "Mar 14", priority: "Normal", orderedBy: "Liza Cruz", contactPerson: "Ms. Reyes" },
-  { id: "PO-2026-0044", manufacturer: "Bayer", items: ["Aspirin 100mg (25 boxes)", "Alaxan FR (10 boxes)"], total: 6800, status: "Delivered", eta: "Mar 17", placed: "Mar 12", priority: "Normal", orderedBy: "Ben Alvarez", contactPerson: "Mr. Lim" },
-  { id: "PO-2026-0043", manufacturer: "Unilab", items: ["Solmux 500mg (8 boxes)"], total: 1950, status: "Processing", eta: "Mar 28", placed: "Mar 20", priority: "Urgent", orderedBy: "Admin", contactPerson: "Mr. Cruz", remarks: "Stock critically low. Rush order." },
-  { id: "PO-2026-0042", manufacturer: "PharmaTech", items: ["Vitamin C 500mg (30 boxes)", "Zinc Sulfate (10 boxes)"], total: 5600, status: "Delivered", eta: "Mar 15", placed: "Mar 10", priority: "Normal", orderedBy: "Jane Reyes", contactPerson: "Ms. Bautista" },
-  { id: "PO-2026-0041", manufacturer: "MedCorp", items: ["Losartan 50mg (20 boxes)"], total: 9200, status: "Cancelled", eta: "—", placed: "Mar 8", priority: "Normal", orderedBy: "Mark Santos", contactPerson: "Mr. Dela Cruz", remarks: "Supplier out of stock. Will reoorder." },
-];
-
 const PAGE_SIZE = 6;
 
 // Status / Priority config
@@ -63,7 +49,27 @@ const emptyForm = () => ({
 });
 
 export function Orders() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>(initialOrders);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchOrders() {
+      setIsLoading(true);
+      try {
+        const result = await window.api.orders.list({ page: 1, pageSize: 500 });
+        const mappedOrders: PurchaseOrder[] = result.items.map(mapPurchaseOrderRecordToPurchaseOrder);
+        setOrders(mappedOrders);
+      } catch (e: any) {
+        window.dispatchEvent(new CustomEvent('app-error', {
+          detail: { title: "Orders Fetch Error", message: e.message || String(e) }
+        }));
+        console.error("Failed to load Orders:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchOrders();
+  }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm());
 
@@ -205,7 +211,10 @@ export function Orders() {
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Purchase Orders</h1>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
+              Purchase Orders
+              {isLoading && <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md animate-pulse">Loading...</span>}
+            </h1>
             <p className="text-sm font-medium text-slate-500 mt-1">Track supply orders from manufacturers and suppliers.</p>
           </div>
           <button onClick={() => setIsModalOpen(true)} className="bg-brand-blue hover:bg-blue-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95 self-start sm:self-auto text-sm">

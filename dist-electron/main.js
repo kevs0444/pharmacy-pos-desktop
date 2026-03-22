@@ -1429,7 +1429,7 @@ function createWindow() {
     icon: path.join(process.env.APP_ROOT, "frontend", "assets", "logos", "logo.png"),
     autoHideMenuBar: true,
     webPreferences: {
-      preload: path.join(__dirname$1, "preload.mjs"),
+      preload: path.join(__dirname$1, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -1461,6 +1461,13 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+app.on("web-contents-created", (_event, contents) => {
+  contents.on("preload-error", (_e, preloadPath, error) => {
+    console.error(`
+[CRITICAL ERROR] Preload script failed: ${preloadPath}`);
+    console.error(error);
+  });
 });
 app.whenReady().then(bootstrapApplication);
 export {

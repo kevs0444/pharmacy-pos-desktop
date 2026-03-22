@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill, ChevronLeft, ChevronRight, LayoutGrid, List, TriangleAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { INVENTORY_DB, InventoryItem, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
+import { InventoryItem, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
+import { mapProductRecordToInventoryItem } from "../lib/mappers";
 import { ProductCard, formatStock } from "./ProductCard";
 
 const CARD_PAGE_SIZE = 8;
@@ -20,6 +21,27 @@ type CartItem = {
 
 export function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [inventoryProducts, setInventoryProducts] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCatalog() {
+      setIsLoading(true);
+      try {
+        const result = await window.api.pos.listCatalog({ page: 1, pageSize: 2000 });
+        const mappedItems: InventoryItem[] = result.items.map(mapProductRecordToInventoryItem);
+        setInventoryProducts(mappedItems);
+      } catch (e: any) {
+        window.dispatchEvent(new CustomEvent('app-error', {
+          detail: { title: "POS Fetch Error", message: e.message || String(e) }
+        }));
+        console.error("Failed to load POS catalog:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCatalog();
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubCategory, setSelectedSubCategory] = useState("All");
@@ -106,7 +128,7 @@ export function POS() {
   };
 
   // Filters (memoized for scale)
-  const filteredProducts = useMemo(() => INVENTORY_DB.filter(p => {
+  const filteredProducts = useMemo(() => inventoryProducts.filter(p => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
     const matchesCategory = selectedCategory === "All" || selectedCategory === "All Products" || p.category === selectedCategory;
@@ -125,7 +147,7 @@ export function POS() {
   const totalPages = Math.max(1, Math.ceil(sortedFilteredProducts.length / pageSize));
   const pagedProducts = sortedFilteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const topSellingProducts = [...INVENTORY_DB]
+  const topSellingProducts = [...inventoryProducts]
     .filter(p => p.isActive !== false && getSellableBatches(p).length > 0)
     .sort((a, b) => b.salesCount - a.salesCount)
     .slice(0, 4);
@@ -441,7 +463,10 @@ export function POS() {
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden bg-slate-50 relative z-0">
         <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800">Sales Counter</h1>
+            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 flex items-center gap-3">
+              Sales Counter
+              {isLoading && <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md animate-pulse">Loading...</span>}
+            </h1>
             <p className="text-sm text-slate-500 font-medium">Point of Sale — select items to add to current transaction.</p>
           </div>
           <div className="flex items-center gap-2">

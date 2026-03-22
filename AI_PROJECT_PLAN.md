@@ -31,10 +31,12 @@ flowchart LR
 
 ### Architecture Summary
 - The **frontend** is responsible for views, user interaction, validation hints, and presentation states
-- The **preload layer** exposes a narrow, typed API surface from Electron to React
+- The **frontend mappers** (`lib/mappers.ts`) decouple raw SQLite rows from React UI state, making the views immune to future database schema adjustments.
+- The **preload layer** exposes a narrow, typed API surface from Electron to React.
+- The **preload layer** is deliberately generated as native, un-bundled CommonJS (`.cjs`) via `node:fs` to strictly comply with Electron's security sandbox without ESModule parsing conflicts, ensuring zero-downtime startup.
 - The **backend** owns business rules, transactions, FEFO enforcement, RBAC enforcement, and persistence
 - **SQLite** is the single system database and the local source of truth
-- **Backup and restore** are first-class offline features, not optional afterthoughts
+- All transient backend failures securely dispatch into a global frontend `app-error` hook, piping logs seamlessly into the user notifications bell instead of crashing views.
 
 ### Layer Responsibilities
 
@@ -122,7 +124,7 @@ flowchart TD
 
 ---
 
-### PHASE 2: Backend Foundation And Frontend Data Access Layer
+### PHASE 2: Backend Foundation And Frontend Data Access Layer - Completed
 *Goal: Establish the permanent local SQLite architecture and replace direct mock usage with typed backend access.*
 
 #### Backend Track

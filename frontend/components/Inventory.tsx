@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { INVENTORY_DB, InventoryItem, BrandType, ProductCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches } from "../lib/mockData";
+import { InventoryItem, BrandType, ProductCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches } from "../lib/mockData";
+import { mapProductRecordToInventoryItem } from "../lib/mappers";
 import { ProductCard, formatStock, getCategoryIcon } from "./ProductCard";
 
 /* 
@@ -43,7 +44,28 @@ const emptyForm = () => ({
 });
 
 export function Inventory() {
-  const [items, setItems] = useState<InventoryItem[]>(INVENTORY_DB);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchInventory() {
+      setIsLoading(true);
+      try {
+        const result = await window.api.inventory.list({ page: 1, pageSize: 2000 });
+        if (!result || !result.items) throw new Error("Backend returned no items wrapper.");
+        const mappedItems: InventoryItem[] = result.items.map(mapProductRecordToInventoryItem);
+        setItems(mappedItems);
+      } catch (e: any) {
+        window.dispatchEvent(new CustomEvent('app-error', {
+          detail: { title: "Inventory Fetch Error", message: e.message || String(e) }
+        }));
+        console.error("Failed to load inventory API:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchInventory();
+  }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -421,7 +443,10 @@ export function Inventory() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Inventory Management</h1>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+              Inventory Management
+              {isLoading && <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md animate-pulse">Loading...</span>}
+            </h1>
             <p className="text-sm text-slate-500 font-medium">Manage and view your pharmacy stock catalog</p>
           </div>
           <button onClick={openAddModal} className="bg-brand-blue hover:bg-blue-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95 self-start sm:self-auto text-sm md:text-base">

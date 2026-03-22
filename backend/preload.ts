@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge } from 'electron';
 import type {
   AdminUserListQuery,
   InventoryListQuery,

@@ -17,6 +17,7 @@ const MOCK_NOTIFICATIONS = [
 export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -39,7 +40,24 @@ export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    
+    // Listen for global bugs/app-errors to put in notifications
+    const handleError = (e: any) => {
+      const { title, message } = e.detail;
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'critical',
+        title,
+        message,
+        time: 'Just now'
+      }, ...prev]);
+    };
+    window.addEventListener('app-error', handleError);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener('app-error', handleError);
+    };
   }, []);
 
   const getRoleIcon = () => {
@@ -137,7 +155,7 @@ export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
                  </p>
                </div>
                <div className="max-h-[300px] overflow-y-auto">
-                 {MOCK_NOTIFICATIONS.map(notif => (
+                 {notifications.map(notif => (
                     <div key={notif.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group">
                        <div className="flex gap-3">
                          <div className={`mt-0.5 shrink-0 ${notif.type === 'critical' ? 'text-red-500' : 'text-yellow-500'}`}>
