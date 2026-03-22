@@ -1,62 +1,86 @@
-# 🏥 Pharmacy POS & Reporting Desktop Application
+# BotikaPlus Pharmacy POS Desktop Application
 
-A modern, offline-first Point of Sale (POS) and inventory reporting desktop application specifically designed for Pharmacies. 
+BotikaPlus is a pure offline desktop Point of Sale and pharmacy operations system built for real client usage. The application is designed to run entirely on a local machine using Electron, React, and SQLite, with no cloud dependency required for day-to-day work.
 
-Built with the ultimate **"Local-First" Electron Architecture**, ensuring zero latency during checkouts, perfect offline capability when internet drops, and seamless background cloud syncing.
+## Overview
+- Offline desktop workflow for pharmacy operations
+- Local SQLite database as the single source of truth
+- React renderer for UI, Electron main process for business logic and system access
+- FEFO-aware inventory handling for batches and expiry-sensitive products
+- Client-focused direction with backup, restore, auditability, and deployment planning
 
-## 🚀 Tech Stack
-- **Desktop Framework:** [Electron](https://www.electronjs.org/) (via `vite-plugin-electron`)
-- **Frontend UI:** [React 18](https://react.dev/) + [Vite](https://vitejs.dev/)
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) + Custom modern UI components
-- **Database (Offline & Online):** Local SQLite embedded database syncing automatically to a Turso Cloud Database via embedded libSQL.
+## Architecture
 
-## 📁 Project Structure
+```mermaid
+flowchart LR
+  User[Pharmacy Staff] --> UI[React Frontend]
+  UI --> API[Typed Preload API]
+  API --> Backend[Electron Main Process]
+  Backend --> DB[(SQLite Database)]
+  Backend --> Backup[Local Backup Files]
+  Backend --> Printer[Receipt Printer and OS Services]
+```
 
-This repository follows a strict separation of frontend UI from backend OS capabilities to maximize scalability and AI-assisted development.
+## Tech Stack
+- **Desktop Framework:** Electron
+- **Frontend UI:** React 18 + Vite
+- **Styling:** Tailwind CSS v4
+- **Database:** SQLite
+- **Language:** TypeScript
+
+## Project Structure
 
 ```text
 /
-├── backend/            # Electron Main Process (Node.js backend & Window control)
-│   ├── main.ts         # Bootstraps the application window and local DB connection
-│   └── preload.ts      # The secure IPC bridge locking down OS features from React
+├── backend/            # Electron main process, IPC bridge, services, and database logic
+│   ├── main.ts         # Application bootstrap and desktop window creation
+│   └── preload.ts      # Secure typed bridge between React and Electron
 │
-├── frontend/           # The React Application (Renderer Process)
-│   ├── App.tsx         # Handlers, POS views, and UI entry point
-│   └── components/     # Scalable Feature-Sliced React components
+├── frontend/           # React renderer process
+│   ├── App.tsx         # Main app composition and feature routing
+│   └── components/     # UI screens and shared components
 │
-├── AI_PROJECT_PLAN.md  # Detailed masterplan for AI IDEs analyzing the project context
-└── package.json        # Unified scripts and dependency map
+├── AI_PROJECT_PLAN.md  # Detailed offline SDLC and backend/frontend implementation roadmap
+└── package.json        # Scripts and dependency manifest
 ```
 
-## 🛠️ Getting Started
+## Current Direction
+- Pure offline deployment using SQLite only
+- Backend and frontend work split clearly for scalable development
+- Inventory, POS, Orders, Admin, Dashboard, Profile, Sales, and Receipt flows already prototyped in the frontend
+- Current documentation assumes a single local workstation deployment per client branch unless future requirements change
 
-### 1. Prerequisites
-- **Node.js** (v18 or higher recommended)
-- **npm** (Node Package Manager)
+## Key Engineering Principles
+- Keep business rules in the backend
+- Keep checkout and stock changes atomic
+- Use FEFO logic for sellable inventory batches
+- Keep every important stock-affecting action auditable
+- Prefer SQL-level pagination, filtering, and search for scalability
 
-### 2. Installation
-Clone the repository and install the Node modules. Because this uses Electron instead of Tauri, there are absolutely no heavy C++ compilers or Rust setup requirements!
+## Getting Started
 
+### Prerequisites
+- Node.js 18 or newer recommended
+- npm
+
+### Install Dependencies
 ```bash
-git clone https://github.com/kevs0444/pharmacy-pos-desktop.git
-cd pharmacy-pos-desktop
 npm install
 ```
 
-### 3. Running in Development
-To launch the desktop window instantly in development mode with Hot-Module Replacement (HMR) for both React and the Electron backend:
-
+### Run In Development
 ```bash
 npm run dev
 ```
 
-### 4. Building for Production
-When the app is finished and ready to install on the Pharmacy's computer, you can compile the incredibly secure, optimized `.exe` installer by running:
-
+### Build For Production
 ```bash
 npm run build
 ```
 
----
+## Documentation
+- `AI_PROJECT_PLAN.md` contains the main execution roadmap
+- `README.md` provides the quick technical overview
 
-*This architecture was engineered specifically to be friendly to Remote Offline Sync capabilities and LLM-assisted software engineering.*
+## Current Priority
+The next major implementation step is replacing mock frontend state with a production-grade local SQLite backend, then connecting Inventory, POS, Orders, Admin, Receipt Settings, and Reporting flows to typed Electron APIs.

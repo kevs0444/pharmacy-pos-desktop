@@ -1,21 +1,32 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import type {
+  AdminUserListQuery,
+  InventoryListQuery,
+  OrderListQuery,
+  PharmacyApi,
+} from './types/api'
 
-// Expose safe IPC mechanisms to the React frontend
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+const api: PharmacyApi = {
+  system: {
+    getStatus: () => ipcRenderer.invoke('system:getStatus'),
   },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+  inventory: {
+    list: (query?: InventoryListQuery) => ipcRenderer.invoke('inventory:list', query),
+    getSummary: () => ipcRenderer.invoke('inventory:getSummary'),
   },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
+  pos: {
+    listCatalog: (query?: InventoryListQuery) => ipcRenderer.invoke('pos:listCatalog', query),
   },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+  orders: {
+    list: (query?: OrderListQuery) => ipcRenderer.invoke('orders:list', query),
   },
-})
+  admin: {
+    listUsers: (query?: AdminUserListQuery) => ipcRenderer.invoke('admin:listUsers', query),
+    listManufacturers: () => ipcRenderer.invoke('admin:listManufacturers'),
+  },
+  settings: {
+    getReceiptSettings: () => ipcRenderer.invoke('settings:getReceiptSettings'),
+  },
+}
+
+contextBridge.exposeInMainWorld('api', api)

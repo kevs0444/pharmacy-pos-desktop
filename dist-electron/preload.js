@@ -1,19 +1,24 @@
 import { contextBridge, ipcRenderer } from "electron";
-contextBridge.exposeInMainWorld("ipcRenderer", {
-  on(...args) {
-    const [channel, listener] = args;
-    return ipcRenderer.on(channel, (event, ...args2) => listener(event, ...args2));
+const api = {
+  system: {
+    getStatus: () => ipcRenderer.invoke("system:getStatus")
   },
-  off(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.off(channel, ...omit);
+  inventory: {
+    list: (query) => ipcRenderer.invoke("inventory:list", query),
+    getSummary: () => ipcRenderer.invoke("inventory:getSummary")
   },
-  send(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.send(channel, ...omit);
+  pos: {
+    listCatalog: (query) => ipcRenderer.invoke("pos:listCatalog", query)
   },
-  invoke(...args) {
-    const [channel, ...omit] = args;
-    return ipcRenderer.invoke(channel, ...omit);
+  orders: {
+    list: (query) => ipcRenderer.invoke("orders:list", query)
+  },
+  admin: {
+    listUsers: (query) => ipcRenderer.invoke("admin:listUsers", query),
+    listManufacturers: () => ipcRenderer.invoke("admin:listManufacturers")
+  },
+  settings: {
+    getReceiptSettings: () => ipcRenderer.invoke("settings:getReceiptSettings")
   }
-});
+};
+contextBridge.exposeInMainWorld("api", api);

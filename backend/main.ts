@@ -1,9 +1,10 @@
 import { app, BrowserWindow, Menu } from 'electron'
-import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { DatabaseManager } from './db/DatabaseManager'
+import { createAppServices } from './services'
+import { registerIpcHandlers } from './ipc/registerIpcHandlers'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -16,6 +17,7 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let databaseManager: DatabaseManager | null = null
 
 // Remove default OS menu to match the clean web app look
 Menu.setApplicationMenu(null)
@@ -44,11 +46,23 @@ function createWindow() {
   }
 }
 
+async function bootstrapApplication() {
+  databaseManager = DatabaseManager.bootstrap(app)
+  const services = createAppServices(databaseManager)
+  registerIpcHandlers(services)
+  createWindow()
+}
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    databaseManager?.close()
     app.quit()
     win = null
   }
+})
+
+app.on('before-quit', () => {
+  databaseManager?.close()
 })
 
 app.on('activate', () => {
@@ -57,4 +71,4 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(bootstrapApplication)
