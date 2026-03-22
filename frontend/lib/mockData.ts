@@ -111,15 +111,16 @@ export function getNearExpiryBatches(item: InventoryItem, days = 90): ProductBat
 }
 
 /** Classify expiry urgency from earliest active batch.
- *  Client thresholds: Red ≤3 months, Orange 3mo–6mo, Green >6mo */
-export function getExpiryStatus(item: InventoryItem): "expired" | "critical" | "warning" | "good" | "none" {
+ *  Client thresholds: Red ≤3 months, Orange 3mo–6mo, Yellow 6mo-1yr, Green >1yr */
+export function getExpiryStatus(item: InventoryItem): "expired" | "critical" | "warning" | "monitor" | "good" | "none" {
   const next = getNextBatch(item);
   if (!next) return "none";
   const d = daysUntilExpiry(next.expiryDate);
   if (d < 0)    return "expired";   // Already expired
   if (d <= 90)  return "critical";  // Red — 3 months or less
   if (d <= 180) return "warning";   // Orange — 6 months or less
-  return "good";                    // Green — more than 6 months
+  if (d <= 365) return "monitor";   // Yellow — 1 year or less
+  return "good";                    // Green — more than 1 year
 }
 
 /**

@@ -60,7 +60,7 @@ export function Inventory() {
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   
   const [restockFilter, setRestockFilter] = useState<"All" | "Out of Stock" | "Low Stock">("All");
-  const [expiryFilter, setExpiryFilter] = useState<"All" | "expired" | "critical" | "warning">("All");
+  const [expiryFilter, setExpiryFilter] = useState<"All" | "expired" | "critical" | "warning" | "monitor">("All");
 
   const handleDelete = (item: InventoryItem) => {
     setItems(prev => prev.filter(i => i.id !== item.id));
@@ -446,7 +446,7 @@ export function Inventory() {
 
           let expiringSoon = items.filter(i => {
             const exp = getExpiryStatus(i);
-            return exp === "expired" || exp === "critical" || exp === "warning";
+            return exp === "expired" || exp === "critical" || exp === "warning" || exp === "monitor";
           });
           const expiringTotal = expiringSoon.length;
           if (expiryFilter !== "All") {
@@ -512,6 +512,7 @@ export function Inventory() {
                           <button onClick={() => setExpiryFilter("expired")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "expired" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Expired</button>
                           <button onClick={() => setExpiryFilter("critical")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "critical" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤3 mo</button>
                           <button onClick={() => setExpiryFilter("warning")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "warning" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤6 mo</button>
+                          <button onClick={() => setExpiryFilter("monitor")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "monitor" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤1 yr</button>
                         </div>
                         <span className="bg-slate-100 text-slate-500 font-bold py-0.5 px-2 rounded-full text-[10px]">{expiringSoon.length}</span>
                       </div>
@@ -526,7 +527,12 @@ export function Inventory() {
                         return (
                           <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
                             <div className="flex items-center gap-3 overflow-hidden">
-                              <div className={cn("w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform", isExpired ? "bg-red-50 border-red-200 text-red-600" : "bg-orange-50 border-orange-100 text-orange-500")}>
+                              <div className={cn("w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform", 
+                                isExpired ? "bg-red-50 border-red-200 text-red-600" : 
+                                expStatus === "critical" ? "bg-red-50 border-red-200 text-red-500" :
+                                expStatus === "warning" ? "bg-orange-50 border-orange-200 text-orange-500" :
+                                "bg-yellow-50 border-yellow-200 text-yellow-600"
+                              )}>
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div className="overflow-hidden">
@@ -535,11 +541,19 @@ export function Inventory() {
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-3">
-                              <p className={cn("font-black text-sm tracking-tight", isExpired ? "text-red-600" : "text-orange-500")}>
+                              <p className={cn("font-black text-sm tracking-tight", 
+                                isExpired || expStatus === "critical" ? "text-red-600" : 
+                                expStatus === "warning" ? "text-orange-500" : 
+                                "text-yellow-600"
+                              )}>
                                 {isExpired ? "EXPIRED" : `${daysUntilExpiry(getNextBatch(item)?.expiryDate || "")}d left`}
                               </p>
-                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", isExpired ? "text-red-400" : "text-orange-400")}>
-                                {isExpired ? "Pull from shelf" : "Warning"}
+                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", 
+                                isExpired || expStatus === "critical" ? "text-red-400" : 
+                                expStatus === "warning" ? "text-orange-400" : 
+                                "text-yellow-500"
+                              )}>
+                                {isExpired ? "Pull from shelf" : expStatus === "critical" ? "Critical Expiry" : expStatus === "warning" ? "Warning" : "Monitor"}
                               </p>
                             </div>
                           </div>
@@ -699,6 +713,8 @@ export function Inventory() {
                                 <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-600">{daysLeft}d left</span>
                               ) : expiryStatus === "warning" ? (
                                 <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-600">{daysLeft !== null ? `${Math.floor(daysLeft / 30)}mo` : ""}</span>
+                              ) : expiryStatus === "monitor" ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-yellow-100 text-yellow-700">{daysLeft !== null ? `${Math.floor(daysLeft / 30)}mo` : ""}</span>
                               ) : expiryStatus === "good" ? (
                                 <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">Safe</span>
                               ) : (
