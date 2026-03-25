@@ -73,6 +73,12 @@ export function Admin() {
         isActive: true,
       });
       await loadManufacturers();
+      window.dispatchEvent(new CustomEvent('app-success', {
+        detail: { 
+          title: "Manufacturer Added", 
+          message: `${mfForm.name} has been successfully registered.` 
+        }
+      }));
       setIsManufacturerModalOpen(false);
       setMfForm({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
     } catch (e: any) {

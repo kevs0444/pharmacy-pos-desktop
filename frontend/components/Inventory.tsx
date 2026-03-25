@@ -206,6 +206,12 @@ export function Inventory() {
         await window.api.inventory.create(payload);
       }
       await loadInventory();
+      window.dispatchEvent(new CustomEvent('app-success', {
+        detail: { 
+          title: editingItem ? "Product Updated" : "Product Added", 
+          message: `${formData.name} has been successfully saved to inventory.` 
+        }
+      }));
       setIsModalOpen(false);
       setEditingItem(null);
       setFormData(emptyForm());

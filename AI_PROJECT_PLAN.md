@@ -36,7 +36,7 @@ flowchart LR
 - The **preload layer** is deliberately generated as native, un-bundled CommonJS (`.cjs`) via `node:fs` to strictly comply with Electron's security sandbox without ESModule parsing conflicts, ensuring zero-downtime startup.
 - The **backend** owns business rules, transactions, FEFO enforcement, RBAC enforcement, and persistence
 - **SQLite** is the single system database and the local source of truth
-- All transient backend failures securely dispatch into a global frontend `app-error` hook, piping logs seamlessly into the user notifications bell instead of crashing views.
+- All backend operations securely dispatch into global frontend `app-error` or `app-success` hooks, piping real-time status updates seamlessly into the user notifications bell.
 
 ### Layer Responsibilities
 
@@ -169,7 +169,7 @@ flowchart TD
 #### Exit Criteria
 - [x] Inventory reflects real SQLite records instead of mock state
 - [x] FEFO-aware batch data is fully operational
-- [ ] Every stock movement is traceable and reviewable
+- [x] Every stock movement is traceable and reviewable
 
 ---
 
@@ -177,24 +177,24 @@ flowchart TD
 *Goal: Deliver a production-grade offline checkout flow with atomic stock deduction and complete sales recording.*
 
 #### Backend Track
-- Implement checkout as a single SQL transaction
-- Deduct stock from the earliest-expiring sellable batch first
-- Write sales transaction headers, line items, payment records, and discount metadata
-- Support prescription-related metadata when required by product category or transaction rules
-- Generate receipt payload data from stored configuration and transaction records
-- Add void or cancellation handling with proper inventory reversal and audit logging if the business requires it
+- [ ] Implement checkout as a single SQL transaction
+- [ ] Deduct stock from the earliest-expiring sellable batch first
+- [ ] Write sales transaction headers, line items, payment records, and discount metadata
+- [ ] Support prescription-related metadata when required by product category or transaction rules
+- [ ] Generate receipt payload data from stored configuration and transaction records
+- [ ] Add void or cancellation handling with proper inventory reversal and audit logging if the business requires it
 
 #### Frontend Track
-- Connect POS catalog, filters, and pagination to SQLite-backed product queries
-- Replace simulated checkout with real backend transaction submission
-- Bind cart confirmation, payment flow, discount flow, and success flow to persistent records
-- Display real lot number and expiry data from backend-selected FEFO batches
-- Connect receipt preview and print workflows to transaction output and stored settings
+- [x] Connect POS catalog, filters, and pagination to SQLite-backed product queries
+- [ ] Replace simulated checkout with real backend transaction submission
+- [ ] Bind cart confirmation, payment flow, discount flow, and success flow to persistent records
+- [ ] Display real lot number and expiry data from backend-selected FEFO batches
+- [ ] Connect receipt preview and print workflows to transaction output and stored settings
 
 #### Exit Criteria
-- A completed sale updates inventory, sales ledgers, and receipt data atomically
-- FEFO deduction is enforced in backend logic, not only displayed in UI
-- POS remains fully usable offline during normal client operations
+- [ ] A completed sale updates inventory, sales ledgers, and receipt data atomically
+- [ ] FEFO deduction is enforced in backend logic, not only displayed in UI
+- [ ] POS remains fully usable offline during normal client operations
 
 ---
 
@@ -202,24 +202,24 @@ flowchart TD
 *Goal: Move administration, access control, purchase ordering, and operational settings into production-ready backend flows.*
 
 #### Backend Track
-- Implement local authentication with hashed passwords
-- Create local session handling appropriate for desktop application use
-- Enforce role-based access control in backend services and IPC handlers
-- Build manufacturer CRUD and purchase order services
-- Persist receipt settings, store profile details, and app-level settings in SQLite
-- Add audit log recording for sensitive actions such as price edits, stock adjustments, user changes, and order status changes
+- [ ] Implement local authentication with hashed passwords
+- [ ] Create local session handling appropriate for desktop application use
+- [ ] Enforce role-based access control in backend services and IPC handlers
+- [x] Build manufacturer CRUD and purchase order services
+- [ ] Persist receipt settings, store profile details, and app-level settings in SQLite
+- [ ] Add audit log recording for sensitive actions such as price edits, stock adjustments, user changes, and order status changes
 
 #### Frontend Track
-- Replace mock login role resolution with real local authentication
-- Connect Admin accounts list, manufacturer management, and employee creation flows to backend APIs
-- Connect Purchase Orders to real persistent tables and status updates
-- Persist Receipt Editor and profile data using backend services
-- Keep UX polished while introducing backend-driven validation and permission-aware behavior
+- [ ] Replace mock login role resolution with real local authentication
+- [x] Connect Admin accounts list, manufacturer management, and employee creation flows to backend APIs
+- [ ] Connect Purchase Orders to real persistent tables and status updates
+- [ ] Persist Receipt Editor and profile data using backend services
+- [x] Keep UX polished while introducing backend-driven validation and permission-aware behavior
 
 #### Exit Criteria
-- Users, orders, manufacturers, and settings are stored locally in SQLite
-- Backend RBAC is active for protected operations
-- Admin workflows are stable enough for real client use
+- [ ] Users, orders, manufacturers, and settings are stored locally in SQLite
+- [ ] Backend RBAC is active for protected operations
+- [x] Admin workflows are stable enough for real client use
 
 ---
 

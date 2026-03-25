@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, ChevronDown, User, LogOut, UserCircle, ShieldCheck, Briefcase, AlertTriangle, PackageX } from "lucide-react";
+import { Bell, ChevronDown, User, LogOut, UserCircle, ShieldCheck, Briefcase, AlertTriangle, PackageX, CheckCircle } from "lucide-react";
 import { TabType } from "./Sidebar";
 
 interface NavbarProps {
@@ -51,12 +51,28 @@ export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
         message,
         time: 'Just now'
       }, ...prev]);
+      setIsNotifOpen(true);
     };
+
+    const handleSuccess = (e: any) => {
+      const { title, message } = e.detail;
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'success',
+        title,
+        message,
+        time: 'Just now'
+      }, ...prev]);
+      setIsNotifOpen(true);
+    };
+
     window.addEventListener('app-error', handleError);
+    window.addEventListener('app-success', handleSuccess);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener('app-error', handleError);
+      window.removeEventListener('app-success', handleSuccess);
     };
   }, []);
 
@@ -158,8 +174,12 @@ export function Navbar({ onLogout, onNavigate, userRole }: NavbarProps) {
                  {notifications.map(notif => (
                     <div key={notif.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer group">
                        <div className="flex gap-3">
-                         <div className={`mt-0.5 shrink-0 ${notif.type === 'critical' ? 'text-red-500' : 'text-yellow-500'}`}>
-                           {notif.type === 'critical' ? <PackageX className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                         <div className={`mt-0.5 shrink-0 ${
+                           notif.type === 'critical' ? 'text-red-500' : 
+                           notif.type === 'success' ? 'text-emerald-500' : 'text-yellow-500'
+                         }`}>
+                           {notif.type === 'critical' ? <PackageX className="w-5 h-5" /> : 
+                            notif.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
                          </div>
                          <div className="flex flex-col">
                            <span className="text-sm font-bold text-slate-800 leading-tight group-hover:text-brand-blue transition-colors">{notif.title}</span>

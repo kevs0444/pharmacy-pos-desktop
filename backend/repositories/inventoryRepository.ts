@@ -35,14 +35,7 @@ type ProductRow = {
 }
 
 export class InventoryRepository {
-  constructor(private readonly db: Database.Database) {
-    try {
-      const count = this.db.prepare('SELECT COUNT(*) as c FROM products').get() as any;
-      console.log(`[DEBUG] InventoryRepository initialized. Total products in entire DB: ${count.c}`);
-    } catch (e) {
-      console.error(`[DEBUG] Failed to count products:`, e);
-    }
-  }
+  constructor(private readonly db: Database.Database) {}
 
   list(query?: InventoryListQuery): PaginatedResult<ProductRecord> {
     const { page, pageSize, offset } = normalizePagination(query)
@@ -137,7 +130,6 @@ export class InventoryRepository {
       .all(params) as ProductRow[]
 
     const items = rows.map((row) => this.mapProduct(row))
-    console.log(`[DEBUG] Fetched ${items.length} items from the database! Total matched: ${totalRow.count}`);
     return buildPaginatedResult(items, totalRow.count, page, pageSize)
   }
 
