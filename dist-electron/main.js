@@ -239,294 +239,6 @@ const initialSchemaMigration = {
   `
 };
 const migrations = [initialSchemaMigration];
-const INVENTORY_DB = [
-  {
-    id: 1,
-    code: "PRD-X91A",
-    name: "Amoxicillin 500mg",
-    genericName: "Antibiotic",
-    manufacturer: "PharmaTech",
-    brandType: "Generic",
-    category: "Medicine",
-    subCategory: "Prescription (Rx)",
-    packagingUnit: "Box",
-    baseUnit: "Capsule",
-    piecesPerUnit: 100,
-    totalStockPieces: 215,
-    unitPriceCost: 400,
-    sellingPricePerUnit: 550,
-    sellingPricePerPiece: 6,
-    salesCount: 1450,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "AMX-B001", lotNumber: "LOT-2024-AMX-01", manufacturingDate: "2024-02-01", expiryDate: "2026-02-28", stockPieces: 15, receivedDate: "2024-02-10" },
-      { batchId: "AMX-B002", lotNumber: "LOT-2025-AMX-02", manufacturingDate: "2025-01-15", expiryDate: "2027-01-14", stockPieces: 100, receivedDate: "2025-01-20" },
-      { batchId: "AMX-B003", lotNumber: "LOT-2025-AMX-03", manufacturingDate: "2025-08-01", expiryDate: "2027-07-31", stockPieces: 100, receivedDate: "2025-08-05" }
-    ]
-  },
-  {
-    id: 2,
-    code: "PRD-V002",
-    name: "Vitamin C 500mg (Ascorbic Acid)",
-    genericName: "Vitamin Supplement",
-    manufacturer: "Vitamins Plus",
-    brandType: "Branded",
-    category: "Vitamins & Supplements",
-    subCategory: "OTC",
-    packagingUnit: "Box",
-    baseUnit: "Tablet",
-    piecesPerUnit: 100,
-    totalStockPieces: 450,
-    unitPriceCost: 200,
-    sellingPricePerUnit: 350,
-    sellingPricePerPiece: 4,
-    discount: 10,
-    salesCount: 890,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "VTC-B001", lotNumber: "VTC-LOT-2025-01", manufacturingDate: "2025-01-10", expiryDate: "2027-01-09", stockPieces: 250, receivedDate: "2025-01-15" },
-      { batchId: "VTC-B002", lotNumber: "VTC-LOT-2025-02", manufacturingDate: "2025-06-01", expiryDate: "2027-05-31", stockPieces: 200, receivedDate: "2025-06-05" }
-    ]
-  },
-  {
-    id: 3,
-    code: "PRD-C119",
-    name: "Paracetamol 500mg",
-    genericName: "Pain reliever / fever reducer",
-    manufacturer: "Generic Pharma",
-    brandType: "Generic",
-    category: "Medicine",
-    subCategory: "OTC",
-    packagingUnit: "Box",
-    baseUnit: "Tablet",
-    piecesPerUnit: 100,
-    totalStockPieces: 10,
-    unitPriceCost: 150,
-    sellingPricePerUnit: 250,
-    sellingPricePerPiece: 3,
-    salesCount: 2100,
-    status: "Out of Stock",
-    isActive: true,
-    batches: [
-      // Only partial batch left — near expiry
-      { batchId: "PCM-B001", lotNumber: "PCM-LOT-2024-03", manufacturingDate: "2024-03-01", expiryDate: "2026-03-31", stockPieces: 10, receivedDate: "2024-03-05" }
-    ]
-  },
-  {
-    id: 4,
-    code: "PRD-B445",
-    name: "Cetirizine 10mg",
-    genericName: "Antihistamine",
-    manufacturer: "AllergyCare",
-    brandType: "Generic",
-    category: "Medicine",
-    subCategory: "OTC",
-    packagingUnit: "Box",
-    baseUnit: "Tablet",
-    piecesPerUnit: 50,
-    totalStockPieces: 280,
-    unitPriceCost: 100,
-    sellingPricePerUnit: 180,
-    sellingPricePerPiece: 5,
-    salesCount: 1200,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "CTZ-B001", lotNumber: "CTZ-2025-01", manufacturingDate: "2025-02-01", expiryDate: "2027-01-31", stockPieces: 150, receivedDate: "2025-02-10" },
-      { batchId: "CTZ-B002", lotNumber: "CTZ-2025-02", manufacturingDate: "2025-09-01", expiryDate: "2027-08-31", stockPieces: 130, receivedDate: "2025-09-10" }
-    ]
-  },
-  {
-    id: 5,
-    code: "PRD-S010",
-    name: "Saline Nasal Spray",
-    genericName: "Decongestant relief",
-    manufacturer: "Respiratory Care",
-    brandType: "Branded",
-    category: "Medicine",
-    subCategory: "OTC",
-    packagingUnit: "Bottle",
-    baseUnit: "Piece",
-    piecesPerUnit: 1,
-    totalStockPieces: 26,
-    unitPriceCost: 150,
-    sellingPricePerUnit: 220,
-    sellingPricePerPiece: 220,
-    salesCount: 450,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "SNS-B001", lotNumber: "SNS-2025-01", manufacturingDate: "2025-03-01", expiryDate: "2027-02-28", stockPieces: 26, receivedDate: "2025-03-10" }
-    ]
-  },
-  {
-    id: 6,
-    code: "PRD-C120",
-    name: "Cough Syrup 120ml",
-    genericName: "Dextromethorphan",
-    manufacturer: "CoughRelief Inc",
-    brandType: "Branded",
-    category: "Medicine",
-    subCategory: "OTC",
-    packagingUnit: "Bottle",
-    baseUnit: "Piece",
-    piecesPerUnit: 1,
-    totalStockPieces: 19,
-    unitPriceCost: 120,
-    sellingPricePerUnit: 180,
-    sellingPricePerPiece: 180,
-    salesCount: 520,
-    status: "Low Stock",
-    isActive: true,
-    batches: [
-      { batchId: "CSY-B001", lotNumber: "CSY-2026-01", manufacturingDate: "2026-01-01", expiryDate: "2026-06-30", stockPieces: 8, receivedDate: "2026-01-05" },
-      // ⚠️ Near expiry!
-      { batchId: "CSY-B002", lotNumber: "CSY-2026-02", manufacturingDate: "2026-02-01", expiryDate: "2027-01-31", stockPieces: 11, receivedDate: "2026-02-10" }
-    ]
-  },
-  {
-    id: 7,
-    code: "PRD-Ca600",
-    name: "Calcium 600mg",
-    genericName: "Bone health supplement",
-    manufacturer: "Vitamins Plus",
-    brandType: "Generic",
-    category: "Vitamins & Supplements",
-    subCategory: "OTC",
-    packagingUnit: "Bottle",
-    baseUnit: "Tablet",
-    piecesPerUnit: 60,
-    totalStockPieces: 180,
-    unitPriceCost: 300,
-    sellingPricePerUnit: 500,
-    sellingPricePerPiece: 10,
-    discount: 20,
-    salesCount: 670,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "CAL-B001", lotNumber: "CAL-2025-01", manufacturingDate: "2025-01-01", expiryDate: "2027-12-31", stockPieces: 180, receivedDate: "2025-01-10" }
-    ]
-  },
-  {
-    id: 8,
-    code: "PRD-D780",
-    name: "Losartan 50mg",
-    genericName: "Blood pressure medication",
-    manufacturer: "HeartHealth",
-    brandType: "Generic",
-    category: "Medicine",
-    subCategory: "Prescription (Rx)",
-    packagingUnit: "Box",
-    baseUnit: "Tablet",
-    piecesPerUnit: 100,
-    totalStockPieces: 115,
-    unitPriceCost: 500,
-    sellingPricePerUnit: 800,
-    sellingPricePerPiece: 10,
-    salesCount: 950,
-    status: "Low Stock",
-    isActive: true,
-    batches: [
-      { batchId: "LST-B001", lotNumber: "LST-2025-01", manufacturingDate: "2025-03-01", expiryDate: "2027-02-28", stockPieces: 15, receivedDate: "2025-03-05" },
-      { batchId: "LST-B002", lotNumber: "LST-2025-02", manufacturingDate: "2025-07-01", expiryDate: "2027-06-30", stockPieces: 100, receivedDate: "2025-07-10" }
-    ]
-  },
-  {
-    id: 9,
-    code: "PRD-T001",
-    name: "Thermometer Digital",
-    genericName: "Medical device",
-    manufacturer: "MedTech",
-    brandType: "Others",
-    category: "Medical Devices",
-    subCategory: "None",
-    packagingUnit: "Box",
-    baseUnit: "Piece",
-    piecesPerUnit: 1,
-    totalStockPieces: 12,
-    unitPriceCost: 150,
-    sellingPricePerUnit: 250,
-    sellingPricePerPiece: 250,
-    salesCount: 150,
-    status: "Low Stock",
-    isActive: true,
-    batches: [
-      { batchId: "THM-B001", lotNumber: "THM-2025-01", manufacturingDate: "2025-01-01", expiryDate: "2030-01-01", stockPieces: 12, receivedDate: "2025-01-15" }
-    ]
-  },
-  {
-    id: 10,
-    code: "PRD-HC01",
-    name: "Ketoconazole 2% Shampoo",
-    genericName: "Antifungal shampoo",
-    manufacturer: "DermaCare",
-    brandType: "Generic",
-    category: "Personal Care",
-    subCategory: "Haircare",
-    packagingUnit: "Bottle",
-    baseUnit: "Piece",
-    piecesPerUnit: 1,
-    totalStockPieces: 45,
-    unitPriceCost: 180,
-    sellingPricePerUnit: 320,
-    sellingPricePerPiece: 320,
-    salesCount: 310,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "KTO-B001", lotNumber: "KTO-2025-01", manufacturingDate: "2025-02-01", expiryDate: "2027-01-31", stockPieces: 45, receivedDate: "2025-02-05" }
-    ]
-  },
-  {
-    id: 11,
-    code: "PRD-B005",
-    name: "Baby Wipes 80s",
-    genericName: "Hypoallergenic wipes",
-    manufacturer: "PureBaby",
-    brandType: "Branded",
-    category: "Baby & Mom",
-    subCategory: "None",
-    packagingUnit: "Pack",
-    baseUnit: "Piece",
-    piecesPerUnit: 1,
-    totalStockPieces: 110,
-    unitPriceCost: 50,
-    sellingPricePerUnit: 85,
-    sellingPricePerPiece: 85,
-    salesCount: 880,
-    status: "In Stock",
-    isActive: true,
-    batches: [
-      { batchId: "BWP-B001", lotNumber: "BWP-2025-01", manufacturingDate: "2025-04-01", expiryDate: "2027-03-31", stockPieces: 110, receivedDate: "2025-04-10" }
-    ]
-  },
-  {
-    id: 12,
-    code: "PRD-I200",
-    name: "Ibuprofen 200mg",
-    genericName: "Anti-inflammatory",
-    manufacturer: "MedCorp",
-    brandType: "Branded",
-    category: "Medicine",
-    subCategory: "OTC",
-    packagingUnit: "Box",
-    baseUnit: "Capsule",
-    piecesPerUnit: 100,
-    totalStockPieces: 50,
-    unitPriceCost: 200,
-    sellingPricePerUnit: 400,
-    sellingPricePerPiece: 5,
-    salesCount: 1800,
-    status: "Low Stock",
-    isActive: true,
-    batches: [
-      { batchId: "IBU-B001", lotNumber: "IBU-2025-01", manufacturingDate: "2025-05-01", expiryDate: "2027-04-30", stockPieces: 50, receivedDate: "2025-05-05" }
-    ]
-  }
-];
 const KEY_LENGTH = 64;
 function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
@@ -700,144 +412,6 @@ function seedProducts(db) {
   if (count.count > 0) {
     return;
   }
-  const manufacturerLookup = /* @__PURE__ */ new Map();
-  const manufacturerRows = db.prepare("SELECT id, name FROM manufacturers").all();
-  for (const row of manufacturerRows) {
-    manufacturerLookup.set(row.name, row.id);
-  }
-  const insertProduct = db.prepare(`
-    INSERT INTO products (
-      code, name, generic_name, manufacturer_id, brand_type, category, sub_category,
-      packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
-      selling_price_per_unit, selling_price_per_piece, discount, is_active, sales_count,
-      status, created_at, updated_at
-    ) VALUES (
-      @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
-      @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
-      @sellingPricePerUnit, @sellingPricePerPiece, @discount, @isActive, @salesCount,
-      @status, @createdAt, @updatedAt
-    )
-  `);
-  const insertBatch = db.prepare(`
-    INSERT INTO product_batches (
-      product_id, batch_code, lot_number, manufacturing_date, expiry_date,
-      stock_pieces, received_date, is_active, created_at, updated_at
-    ) VALUES (
-      @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
-      @stockPieces, @receivedDate, 1, @createdAt, @updatedAt
-    )
-  `);
-  const insertMovement = db.prepare(`
-    INSERT INTO inventory_movements (
-      product_id, product_batch_id, movement_type, quantity_pieces, reference_type,
-      reference_id, reason, performed_by_user_id, created_at
-    ) VALUES (
-      @productId, @productBatchId, @movementType, @quantityPieces, @referenceType,
-      @referenceId, @reason, @performedByUserId, @createdAt
-    )
-  `);
-  for (const product of INVENTORY_DB) {
-    const timestamp = nowIso();
-    const manufacturerId = product.manufacturer ? manufacturerLookup.get(product.manufacturer) ?? null : null;
-    const productResult = insertProduct.run({
-      code: product.code,
-      name: product.name,
-      genericName: product.genericName ?? null,
-      manufacturerId,
-      brandType: product.brandType,
-      category: product.category,
-      subCategory: product.subCategory,
-      packagingUnit: product.packagingUnit,
-      baseUnit: product.baseUnit,
-      piecesPerUnit: product.piecesPerUnit,
-      totalStockPieces: product.totalStockPieces,
-      unitPriceCost: product.unitPriceCost,
-      sellingPricePerUnit: product.sellingPricePerUnit,
-      sellingPricePerPiece: product.sellingPricePerPiece,
-      discount: product.discount ?? null,
-      isActive: product.isActive ? 1 : 0,
-      salesCount: product.salesCount,
-      status: product.status,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
-    const productId = Number(productResult.lastInsertRowid);
-    for (const batch of product.batches) {
-      const batchTimestamp = nowIso();
-      const batchResult = insertBatch.run({
-        productId,
-        batchCode: batch.batchId,
-        lotNumber: batch.lotNumber,
-        manufacturingDate: batch.manufacturingDate,
-        expiryDate: batch.expiryDate,
-        stockPieces: batch.stockPieces,
-        receivedDate: batch.receivedDate,
-        createdAt: batchTimestamp,
-        updatedAt: batchTimestamp
-      });
-      insertMovement.run({
-        productId,
-        productBatchId: Number(batchResult.lastInsertRowid),
-        movementType: "OPENING_BALANCE",
-        quantityPieces: batch.stockPieces,
-        referenceType: "SEED",
-        referenceId: batch.batchId,
-        reason: "Initial seeded inventory from approved UI prototype data",
-        performedByUserId: 1,
-        createdAt: batchTimestamp
-      });
-    }
-  }
-  for (let i = 1; i <= 1e3; i++) {
-    const timestamp = nowIso();
-    const manufacturerId = Array.from(manufacturerLookup.values())[i % manufacturerLookup.size] ?? null;
-    const productResult = insertProduct.run({
-      code: `TST-${String(i).padStart(4, "0")}`,
-      name: `Test Medicine ${i} 500mg`,
-      genericName: `Test Generic ${i}`,
-      manufacturerId,
-      brandType: i % 2 === 0 ? "Branded" : "Generic",
-      category: "Pharmaceutical",
-      subCategory: "Test Data",
-      packagingUnit: "Box",
-      baseUnit: "Piece",
-      piecesPerUnit: 10,
-      totalStockPieces: 50,
-      unitPriceCost: 100,
-      sellingPricePerUnit: 1500,
-      sellingPricePerPiece: 150,
-      discount: null,
-      isActive: 1,
-      salesCount: 0,
-      status: "Active",
-      createdAt: timestamp,
-      updatedAt: timestamp
-    });
-    const productId = Number(productResult.lastInsertRowid);
-    const batchTimestamp = nowIso();
-    const batchResult = insertBatch.run({
-      productId,
-      batchCode: `TB-${String(i).padStart(4, "0")}`,
-      lotNumber: `LOT-T${i}`,
-      manufacturingDate: "2026-01-01",
-      expiryDate: "2028-12-31",
-      stockPieces: 50,
-      receivedDate: "2026-03-01",
-      createdAt: batchTimestamp,
-      updatedAt: batchTimestamp
-    });
-    insertMovement.run({
-      productId,
-      productBatchId: Number(batchResult.lastInsertRowid),
-      movementType: "OPENING_BALANCE",
-      quantityPieces: 50,
-      referenceType: "SEED",
-      referenceId: `TB-${String(i).padStart(4, "0")}`,
-      reason: "1000 Scale Test Data",
-      performedByUserId: 1,
-      createdAt: batchTimestamp
-    });
-  }
 }
 function seedReceiptSettings(db) {
   const count = db.prepare("SELECT COUNT(*) AS count FROM receipt_settings").get();
@@ -999,6 +573,9 @@ class AdminService {
   listManufacturers() {
     return this.manufacturersRepository.list();
   }
+  createManufacturer(data) {
+    return this.manufacturersRepository.create(data);
+  }
 }
 class InventoryService {
   constructor(inventoryRepository) {
@@ -1009,6 +586,21 @@ class InventoryService {
   }
   getSummary() {
     return this.inventoryRepository.getSummary();
+  }
+  create(input) {
+    return this.inventoryRepository.create(input);
+  }
+  update(id, input) {
+    return this.inventoryRepository.update(id, input);
+  }
+  remove(id) {
+    this.inventoryRepository.remove(id);
+  }
+  setActive(id, isActive) {
+    return this.inventoryRepository.setActive(id, isActive);
+  }
+  listBatches(productId) {
+    return this.inventoryRepository.listBatches(productId);
   }
 }
 class OrdersService {
@@ -1075,6 +667,12 @@ function escapeLike(value) {
 class InventoryRepository {
   constructor(db) {
     this.db = db;
+    try {
+      const count = this.db.prepare("SELECT COUNT(*) as c FROM products").get();
+      console.log(`[DEBUG] InventoryRepository initialized. Total products in entire DB: ${count.c}`);
+    } catch (e) {
+      console.error(`[DEBUG] Failed to count products:`, e);
+    }
   }
   list(query) {
     var _a;
@@ -1157,6 +755,7 @@ class InventoryRepository {
         LIMIT @limit OFFSET @offset
       `).all(params);
     const items = rows.map((row) => this.mapProduct(row));
+    console.log(`[DEBUG] Fetched ${items.length} items from the database! Total matched: ${totalRow.count}`);
     return buildPaginatedResult(items, totalRow.count, page, pageSize);
   }
   getSummary() {
@@ -1178,6 +777,321 @@ class InventoryRepository {
         FROM products
       `).get();
     return row;
+  }
+  create(input) {
+    this.validateProductInput(input);
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const totalStockPieces = input.initialBatch ? input.initialBatch.stockPieces : input.totalStockPieces;
+    const status = this.computeStatus(totalStockPieces, input.piecesPerUnit);
+    const createTxn = this.db.transaction(() => {
+      const manufacturerId = this.resolveManufacturerId(input.manufacturerName ?? null, timestamp);
+      const insertProduct = this.db.prepare(`
+        INSERT INTO products (
+          code, name, generic_name, manufacturer_id, brand_type, category, sub_category,
+          packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
+          selling_price_per_unit, selling_price_per_piece, discount, is_active, sales_count,
+          status, created_at, updated_at
+        ) VALUES (
+          @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
+          @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
+          @sellingPricePerUnit, @sellingPricePerPiece, @discount, @isActive, @salesCount,
+          @status, @createdAt, @updatedAt
+        )
+      `);
+      const productResult = insertProduct.run({
+        code: input.code,
+        name: input.name,
+        genericName: input.genericName ?? null,
+        manufacturerId,
+        brandType: input.brandType,
+        category: input.category,
+        subCategory: input.subCategory,
+        packagingUnit: input.packagingUnit,
+        baseUnit: input.baseUnit,
+        piecesPerUnit: input.piecesPerUnit,
+        totalStockPieces,
+        unitPriceCost: input.unitPriceCost,
+        sellingPricePerUnit: input.sellingPricePerUnit,
+        sellingPricePerPiece: input.sellingPricePerPiece,
+        discount: input.discount ?? null,
+        isActive: input.isActive === false ? 0 : 1,
+        salesCount: input.salesCount ?? 0,
+        status,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      const productId = Number(productResult.lastInsertRowid);
+      if (input.initialBatch && input.initialBatch.stockPieces > 0) {
+        const batchCode = `B-${productId}-${Date.now()}`;
+        const insertBatch = this.db.prepare(`
+          INSERT INTO product_batches (
+            product_id, batch_code, lot_number, manufacturing_date, expiry_date,
+            stock_pieces, received_date, is_active, created_at, updated_at
+          ) VALUES (
+            @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
+            @stockPieces, @receivedDate, 1, @createdAt, @updatedAt
+          )
+        `);
+        const batchResult = insertBatch.run({
+          productId,
+          batchCode,
+          lotNumber: input.initialBatch.lotNumber,
+          manufacturingDate: input.initialBatch.manufacturingDate ?? null,
+          expiryDate: input.initialBatch.expiryDate,
+          stockPieces: input.initialBatch.stockPieces,
+          receivedDate: input.initialBatch.receivedDate ?? timestamp.slice(0, 10),
+          createdAt: timestamp,
+          updatedAt: timestamp
+        });
+        this.db.prepare(`
+          INSERT INTO inventory_movements (
+            product_id, product_batch_id, movement_type, quantity_pieces, reference_type,
+            reference_id, reason, performed_by_user_id, created_at
+          ) VALUES (
+            @productId, @productBatchId, 'OPENING_BALANCE', @quantityPieces, 'CREATE_PRODUCT',
+            @referenceId, @reason, NULL, @createdAt
+          )
+        `).run({
+          productId,
+          productBatchId: Number(batchResult.lastInsertRowid),
+          quantityPieces: input.initialBatch.stockPieces,
+          referenceId: input.code,
+          reason: "Initial stock on product creation",
+          createdAt: timestamp
+        });
+      }
+      return productId;
+    });
+    const createdId = createTxn();
+    return this.getById(createdId);
+  }
+  update(id, input) {
+    this.validateProductInput(input);
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const manufacturerId = this.resolveManufacturerId(input.manufacturerName ?? null, timestamp);
+    const status = this.computeStatus(input.totalStockPieces, input.piecesPerUnit);
+    const result = this.db.prepare(`
+      UPDATE products
+      SET
+        code = @code,
+        name = @name,
+        generic_name = @genericName,
+        manufacturer_id = @manufacturerId,
+        brand_type = @brandType,
+        category = @category,
+        sub_category = @subCategory,
+        packaging_unit = @packagingUnit,
+        base_unit = @baseUnit,
+        pieces_per_unit = @piecesPerUnit,
+        total_stock_pieces = @totalStockPieces,
+        unit_price_cost = @unitPriceCost,
+        selling_price_per_unit = @sellingPricePerUnit,
+        selling_price_per_piece = @sellingPricePerPiece,
+        discount = @discount,
+        is_active = @isActive,
+        sales_count = @salesCount,
+        status = @status,
+        updated_at = @updatedAt
+      WHERE id = @id
+    `).run({
+      id,
+      code: input.code,
+      name: input.name,
+      genericName: input.genericName ?? null,
+      manufacturerId,
+      brandType: input.brandType,
+      category: input.category,
+      subCategory: input.subCategory,
+      packagingUnit: input.packagingUnit,
+      baseUnit: input.baseUnit,
+      piecesPerUnit: input.piecesPerUnit,
+      totalStockPieces: input.totalStockPieces,
+      unitPriceCost: input.unitPriceCost,
+      sellingPricePerUnit: input.sellingPricePerUnit,
+      sellingPricePerPiece: input.sellingPricePerPiece,
+      discount: input.discount ?? null,
+      isActive: input.isActive ? 1 : 0,
+      salesCount: input.salesCount,
+      status,
+      updatedAt: timestamp
+    });
+    if (result.changes === 0) {
+      throw new Error(`Product with ID ${id} was not found`);
+    }
+    return this.getById(id);
+  }
+  remove(id) {
+    const salesItemRow = this.db.prepare("SELECT COUNT(*) AS count FROM sales_transaction_items WHERE product_id = ?").get(id);
+    if (salesItemRow.count > 0) {
+      throw new Error("Cannot delete product with sales history");
+    }
+    const removeTxn = this.db.transaction(() => {
+      this.db.prepare("DELETE FROM inventory_movements WHERE product_id = ?").run(id);
+      this.db.prepare("DELETE FROM product_batches WHERE product_id = ?").run(id);
+      const result = this.db.prepare("DELETE FROM products WHERE id = ?").run(id);
+      if (result.changes === 0) {
+        throw new Error(`Product with ID ${id} was not found`);
+      }
+    });
+    removeTxn();
+  }
+  setActive(id, isActive) {
+    const existing = this.getById(id);
+    const status = this.computeStatus(existing.totalStockPieces, existing.piecesPerUnit);
+    const result = this.db.prepare(`
+      UPDATE products
+      SET is_active = @isActive, status = @status, updated_at = @updatedAt
+      WHERE id = @id
+    `).run({
+      id,
+      isActive: isActive ? 1 : 0,
+      status,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    if (result.changes === 0) {
+      throw new Error(`Product with ID ${id} was not found`);
+    }
+    return this.getById(id);
+  }
+  listBatches(productId) {
+    const rows = this.db.prepare(`
+      SELECT
+        id,
+        product_id AS productId,
+        batch_code AS batchCode,
+        lot_number AS lotNumber,
+        manufacturing_date AS manufacturingDate,
+        expiry_date AS expiryDate,
+        stock_pieces AS stockPieces,
+        received_date AS receivedDate,
+        is_active AS isActive,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+      FROM product_batches
+      WHERE product_id = @productId
+      ORDER BY date(expiry_date) ASC, id ASC
+    `).all({ productId });
+    return rows.map((row) => ({ ...row, isActive: Boolean(row.isActive) }));
+  }
+  getById(id) {
+    const row = this.db.prepare(`
+      SELECT
+        p.id,
+        p.code,
+        p.name,
+        p.generic_name AS genericName,
+        p.manufacturer_id AS manufacturerId,
+        m.name AS manufacturerName,
+        p.brand_type AS brandType,
+        p.category,
+        p.sub_category AS subCategory,
+        p.packaging_unit AS packagingUnit,
+        p.base_unit AS baseUnit,
+        p.pieces_per_unit AS piecesPerUnit,
+        p.total_stock_pieces AS totalStockPieces,
+        p.unit_price_cost AS unitPriceCost,
+        p.selling_price_per_unit AS sellingPricePerUnit,
+        p.selling_price_per_piece AS sellingPricePerPiece,
+        p.discount,
+        p.is_active AS isActive,
+        p.sales_count AS salesCount,
+        p.status,
+        (
+          SELECT pb.lot_number
+          FROM product_batches pb
+          WHERE pb.product_id = p.id AND pb.is_active = 1 AND pb.stock_pieces > 0
+          ORDER BY date(pb.expiry_date) ASC
+          LIMIT 1
+        ) AS nextBatchLotNumber,
+        (
+          SELECT pb.expiry_date
+          FROM product_batches pb
+          WHERE pb.product_id = p.id AND pb.is_active = 1 AND pb.stock_pieces > 0
+          ORDER BY date(pb.expiry_date) ASC
+          LIMIT 1
+        ) AS nextBatchExpiryDate
+      FROM products p
+      LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+      WHERE p.id = @id
+    `).get({ id });
+    if (!row) {
+      throw new Error(`Product with ID ${id} was not found`);
+    }
+    return this.mapProduct(row);
+  }
+  resolveManufacturerId(manufacturerName, timestamp) {
+    const normalizedName = manufacturerName == null ? void 0 : manufacturerName.trim();
+    if (!normalizedName) {
+      return null;
+    }
+    const existing = this.db.prepare("SELECT id FROM manufacturers WHERE lower(name) = lower(?) LIMIT 1").get(normalizedName);
+    if (existing) {
+      return existing.id;
+    }
+    this.db.prepare(`
+      INSERT INTO manufacturers (name, contact_person, email, phone, category, address, is_active, created_at, updated_at)
+      VALUES (@name, NULL, NULL, NULL, NULL, NULL, 1, @createdAt, @updatedAt)
+    `).run({
+      name: normalizedName,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+    const created = this.db.prepare("SELECT id FROM manufacturers WHERE lower(name) = lower(?) LIMIT 1").get(normalizedName);
+    if (!created) {
+      throw new Error("Failed to resolve manufacturer");
+    }
+    return created.id;
+  }
+  computeStatus(totalStockPieces, piecesPerUnit) {
+    if (totalStockPieces <= 0) {
+      return "Out of Stock";
+    }
+    if (totalStockPieces <= piecesPerUnit) {
+      return "Low Stock";
+    }
+    return "In Stock";
+  }
+  validateProductInput(input) {
+    if (!input.code.trim()) {
+      throw new Error("Product code is required");
+    }
+    if (!input.name.trim()) {
+      throw new Error("Product name is required");
+    }
+    if (!input.packagingUnit.trim() || !input.baseUnit.trim()) {
+      throw new Error("Packaging and base units are required");
+    }
+    if (!Number.isInteger(input.piecesPerUnit) || input.piecesPerUnit < 1) {
+      throw new Error("Pieces per unit must be a positive integer");
+    }
+    if (!Number.isFinite(input.totalStockPieces) || input.totalStockPieces < 0) {
+      throw new Error("Total stock must be zero or positive");
+    }
+    if (!Number.isFinite(input.unitPriceCost) || input.unitPriceCost < 0) {
+      throw new Error("Cost price must be zero or positive");
+    }
+    if (!Number.isFinite(input.sellingPricePerUnit) || input.sellingPricePerUnit < 0) {
+      throw new Error("Selling price per unit must be zero or positive");
+    }
+    if (!Number.isFinite(input.sellingPricePerPiece) || input.sellingPricePerPiece < 0) {
+      throw new Error("Selling price per piece must be zero or positive");
+    }
+    if (input.discount !== null && input.discount !== void 0) {
+      if (!Number.isFinite(input.discount) || input.discount < 0 || input.discount > 100) {
+        throw new Error("Discount must be between 0 and 100");
+      }
+    }
+    if ("initialBatch" in input && input.initialBatch) {
+      if (!input.initialBatch.lotNumber.trim()) {
+        throw new Error("Initial batch lot number is required");
+      }
+      if (!input.initialBatch.expiryDate.trim()) {
+        throw new Error("Initial batch expiry date is required");
+      }
+      if (!Number.isFinite(input.initialBatch.stockPieces) || input.initialBatch.stockPieces < 0) {
+        throw new Error("Initial batch stock must be zero or positive");
+      }
+    }
   }
   mapProduct(row) {
     return {
@@ -1207,6 +1121,23 @@ class ManufacturersRepository {
         ORDER BY name ASC
       `).all();
     return rows.map((row) => ({ ...row, isActive: Boolean(row.isActive) }));
+  }
+  create(data) {
+    const stmt = this.db.prepare(`
+      INSERT INTO manufacturers (name, contact_person, email, phone, category, address, is_active, remarks)
+      VALUES (@name, @contactPerson, @email, @phone, @category, @address, @isActive, @remarks)
+    `);
+    const res = stmt.run({
+      name: data.name,
+      contactPerson: data.contactPerson,
+      email: data.email || null,
+      phone: data.phone || null,
+      category: data.category || "Supplier",
+      address: data.address || null,
+      isActive: data.isActive === false ? 0 : 1,
+      remarks: data.remarks || null
+    });
+    return res.lastInsertRowid;
   }
 }
 class OrdersRepository {
@@ -1406,10 +1337,22 @@ function registerIpcHandlers(services) {
   registerHandler("system:getStatus", () => services.systemService.getStatus());
   registerHandler("inventory:list", (query) => services.inventoryService.list(query));
   registerHandler("inventory:getSummary", () => services.inventoryService.getSummary());
+  registerHandler("inventory:create", (payload) => services.inventoryService.create(payload));
+  registerHandler(
+    "inventory:update",
+    ({ id, payload }) => services.inventoryService.update(id, payload)
+  );
+  registerHandler("inventory:remove", (id) => services.inventoryService.remove(id));
+  registerHandler(
+    "inventory:setActive",
+    ({ id, isActive }) => services.inventoryService.setActive(id, isActive)
+  );
+  registerHandler("inventory:listBatches", (productId) => services.inventoryService.listBatches(productId));
   registerHandler("pos:listCatalog", (query) => services.posService.listCatalog(query));
   registerHandler("orders:list", (query) => services.ordersService.list(query));
   registerHandler("admin:listUsers", (query) => services.adminService.listUsers(query));
   registerHandler("admin:listManufacturers", () => services.adminService.listManufacturers());
+  registerHandler("admin:createManufacturer", (payload) => services.adminService.createManufacturer(payload));
   registerHandler("settings:getReceiptSettings", () => services.settingsService.getReceiptSettings());
 }
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));

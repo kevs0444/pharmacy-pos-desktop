@@ -16,4 +16,8 @@ export class AdminService {
   listManufacturers(): ManufacturerRecord[] {
     return this.manufacturersRepository.list()
   }
+
+  createManufacturer(data: any): number {
+    return this.manufacturersRepository.create(data)
+  }
 }

@@ -30,5 +30,6 @@ export function registerIpcHandlers(services: AppServices): void {
   registerHandler<OrderListQuery | undefined>('orders:list', (query) => services.ordersService.list(query))
   registerHandler<AdminUserListQuery | undefined>('admin:listUsers', (query) => services.adminService.listUsers(query))
   registerHandler('admin:listManufacturers', () => services.adminService.listManufacturers())
+  registerHandler<any>('admin:createManufacturer', (payload) => services.adminService.createManufacturer(payload))
   registerHandler('settings:getReceiptSettings', () => services.settingsService.getReceiptSettings())
 }

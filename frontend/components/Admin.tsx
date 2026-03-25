@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Users, 
   ShieldCheck, 
@@ -35,27 +35,51 @@ const mockAccounts = [
   { name: "Erick", email: "erick@gmail.com", role: "STAFF", status: "Active", seed: "erick" },
 ];
 
-const INITIAL_MANUFACTURERS = [
-  'Unilever', 'Pfizer', 'TGP Generics', 'Bayer', 'GSK', 'Unilab'
-];
-
 export function Admin() {
   const [viewState, setViewState] = useState<"dashboard" | "accounts" | "receipt">("dashboard");
   const [isManufacturerModalOpen, setIsManufacturerModalOpen] = useState(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
-  const [manufacturers, setManufacturers] = useState(INITIAL_MANUFACTURERS);
+  const [manufacturers, setManufacturers] = useState<string[]>([]);
   const [accounts, setAccounts] = useState(mockAccounts);
+
+  React.useEffect(() => {
+    loadManufacturers();
+  }, []);
+
+  const loadManufacturers = async () => {
+    try {
+      const result = await window.api.admin.listManufacturers();
+      setManufacturers(result.map((m: any) => m.name));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Manufacturer form
   const [mfForm, setMfForm] = useState({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
   // Employee form
   const [empForm, setEmpForm] = useState({ name: '', email: '', role: 'STAFF', password: '' });
 
-  const handleSaveManufacturer = () => {
+  const handleSaveManufacturer = async () => {
     if (!mfForm.name) return;
-    setManufacturers(prev => [...prev, mfForm.name]);
-    setIsManufacturerModalOpen(false);
-    setMfForm({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
+    try {
+      await window.api.admin.createManufacturer({
+        name: mfForm.name,
+        contactPerson: mfForm.contact || null,
+        email: mfForm.email || null,
+        phone: mfForm.phone || null,
+        address: mfForm.address || null,
+        category: mfForm.category,
+        isActive: true,
+      });
+      await loadManufacturers();
+      setIsManufacturerModalOpen(false);
+      setMfForm({ name: '', contact: '', email: '', phone: '', address: '', category: 'Pharmaceutical' });
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Save Manufacturer Error", message: e.message || String(e) }
+      }));
+    }
   };
 
   const handleSaveEmployee = () => {

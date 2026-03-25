@@ -131,6 +131,7 @@ export interface PharmacyApi {
   admin: {
     listUsers: (query?: AdminUserListQuery) => Promise<PaginatedResult<Omit<UserRecord, 'passwordHash'>>>
     listManufacturers: () => Promise<ManufacturerRecord[]>
+    createManufacturer: (payload: any) => Promise<number>
   }
   settings: {
     getReceiptSettings: () => Promise<ReceiptSettingsRecord>

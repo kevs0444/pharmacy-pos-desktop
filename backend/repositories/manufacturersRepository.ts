@@ -27,4 +27,22 @@ export class ManufacturersRepository {
 
     return rows.map((row) => ({ ...row, isActive: Boolean(row.isActive) }))
   }
+
+  create(data: Omit<ManufacturerRecord, 'id' | 'createdAt' | 'updatedAt'>): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO manufacturers (name, contact_person, email, phone, category, address, is_active, remarks)
+      VALUES (@name, @contactPerson, @email, @phone, @category, @address, @isActive, @remarks)
+    `)
+    const res = stmt.run({
+      name: data.name,
+      contactPerson: data.contactPerson,
+      email: data.email || null,
+      phone: data.phone || null,
+      category: data.category || 'Supplier',
+      address: data.address || null,
+      isActive: data.isActive === false ? 0 : 1,
+      remarks: (data as any).remarks || null
+    })
+    return res.lastInsertRowid as number
+  }
 }

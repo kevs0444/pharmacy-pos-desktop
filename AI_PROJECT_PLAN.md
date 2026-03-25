@@ -148,28 +148,28 @@ flowchart TD
 
 ---
 
-### PHASE 3: Inventory And FEFO Engine
+### PHASE 3: Inventory And FEFO Engine - Completed Data Foundation
 *Goal: Make inventory management operational, accurate, and auditable using real database records.*
 
 #### Backend Track
-- Implement normalized tables for products, product batches, and inventory movements
-- Build product CRUD services with validation for packaging hierarchy, pricing, and active status
-- Implement batch receiving flows with lot number, manufacturing date, expiry date, and received date
-- Enforce FEFO queries for stock selection and near-expiry monitoring
-- Introduce stock adjustment services for corrections, damaged stock, and manual recounts
-- Record every stock-affecting action in an inventory movement ledger
+- [x] Implement normalized tables for products, product batches, and inventory movements
+- [x] Build product CRUD services with validation for packaging hierarchy, pricing, and active status
+- [x] Implement batch receiving flows with lot number, manufacturing date, expiry date, and received date
+- [ ] Enforce FEFO queries for stock selection and near-expiry monitoring
+- [ ] Introduce stock adjustment services for corrections, damaged stock, and manual recounts
+- [x] Record every stock-affecting action in an inventory movement ledger
 
 #### Frontend Track
-- Connect Inventory list and card views to real paginated SQLite queries
-- Connect Add, Edit, Disable, Enable, and Delete flows to backend APIs
-- Add UI for receiving new stock batches and reviewing existing batches
-- Replace mock low-stock and near-expiry widgets with live backend-powered results
-- Keep sorting, filtering, and pagination behavior consistent with the validated prototype
+- [x] Connect Inventory list and card views to real paginated SQLite queries
+- [x] Connect Add, Edit, Disable, Enable, and Delete flows to backend APIs
+- [x] Add UI for receiving new stock batches and reviewing existing batches
+- [ ] Replace mock low-stock and near-expiry widgets with live backend-powered results
+- [x] Keep sorting, filtering, and pagination behavior consistent with the validated prototype
 
 #### Exit Criteria
-- Inventory reflects real SQLite records instead of mock state
-- FEFO-aware batch data is fully operational
-- Every stock movement is traceable and reviewable
+- [x] Inventory reflects real SQLite records instead of mock state
+- [x] FEFO-aware batch data is fully operational
+- [ ] Every stock movement is traceable and reviewable
 
 ---
 
