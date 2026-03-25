@@ -1,5 +1,5 @@
 import type { ProductRecord, PurchaseOrderRecord } from '../../backend/types/domain';
-import type { InventoryItem } from './mockData';
+import type { InventoryItem } from './inventoryModel';
 
 // Future-proof mapper: As the backend database evolves, we only update this single function
 // rather than rewriting every single React component that relies on product shapes.
@@ -27,10 +27,10 @@ export function mapProductRecordToInventoryItem(pr: ProductRecord): InventoryIte
     batches: pr.totalStockPieces > 0 ? [{
       batchId: "B" + (pr.nextBatchLotNumber || "1"),
       lotNumber: pr.nextBatchLotNumber || "LOT-1",
-      manufacturingDate: "2024-01-01",
+      manufacturingDate: new Date().toISOString().slice(0, 10),
       expiryDate: pr.nextBatchExpiryDate || "2030-12-31",
       stockPieces: pr.totalStockPieces,
-      receivedDate: new Date().toISOString()
+      receivedDate: new Date().toISOString().slice(0, 10)
     }] : []
   } as InventoryItem;
 }

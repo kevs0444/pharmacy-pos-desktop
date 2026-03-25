@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill, ChevronLeft, ChevronRight, LayoutGrid, List, TriangleAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { InventoryItem, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
+import type { ProductBatchRecord } from "../../backend/types/domain";
+import { InventoryItem, daysUntilExpiry, getSellableBatches, mapBatchRecordToInventoryBatch } from "../lib/inventoryModel";
 import { mapProductRecordToInventoryItem } from "../lib/mappers";
 import { ProductCard, formatStock } from "./ProductCard";
 
@@ -28,8 +29,27 @@ export function POS() {
     async function fetchCatalog() {
       setIsLoading(true);
       try {
-        const result = await window.api.pos.listCatalog({ page: 1, pageSize: 2000 });
-        const mappedItems: InventoryItem[] = result.items.map(mapProductRecordToInventoryItem);
+        const pageSize = 100;
+        let page = 1;
+        let totalPages = 1;
+        const allProducts = [];
+
+        do {
+          const result = await window.api.pos.listCatalog({ page, pageSize, includeInactive: false, onlySellable: true });
+          allProducts.push(...result.items);
+          totalPages = result.totalPages;
+          page += 1;
+        } while (page <= totalPages);
+
+        const mappedItems: InventoryItem[] = await Promise.all(
+          allProducts.map(async (product) => {
+            const batches = await window.api.inventory.listBatches(product.id);
+            return {
+              ...mapProductRecordToInventoryItem(product),
+              batches: batches.map((batch: ProductBatchRecord) => mapBatchRecordToInventoryBatch(batch)),
+            };
+          }),
+        );
         setInventoryProducts(mappedItems);
       } catch (e: any) {
         window.dispatchEvent(new CustomEvent('app-error', {

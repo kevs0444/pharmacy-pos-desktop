@@ -3,20 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
 import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import { InventoryItem, BrandType, ProductCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches } from "../lib/mockData";
+import type { CreateProductInput, UpdateProductInput } from "../../backend/types/api";
+import type { ProductBatchRecord } from "../../backend/types/domain";
+import { InventoryItem, BrandType, ProductCategory, ProductSubCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches, mapBatchRecordToInventoryBatch } from "../lib/inventoryModel";
 import { mapProductRecordToInventoryItem } from "../lib/mappers";
 import { ProductCard, formatStock, getCategoryIcon } from "./ProductCard";
-
-/* 
- * PERFORMANCE NOTE:
- * Inventory is designed to scale to thousands of products.
- * - All filtering/sorting is memoized via useMemo.
- * - Pagination renders only PAGE_SIZE rows at a time in DOM.
- * - In Phase 2 (DB integration), replace INVENTORY_DB with
- *   cursor-based SQL queries: SELECT * FROM products LIMIT 20 OFFSET {page*20}
- * - Consider adding a server-side search index (FTS5 in SQLite)
- *   for instant full-text search across 10,000+ products.
- */
 
 const LIST_PAGE_SIZE = 20;
 const CARD_PAGE_SIZE = 12;
@@ -47,24 +38,44 @@ export function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchInventory() {
-      setIsLoading(true);
-      try {
-        const result = await window.api.inventory.list({ page: 1, pageSize: 2000 });
+  const loadInventory = async () => {
+    setIsLoading(true);
+    try {
+      const pageSize = 100;
+      let page = 1;
+      let totalPages = 1;
+      const allProducts = [];
+
+      do {
+        const result = await window.api.inventory.list({ page, pageSize, includeInactive: true });
         if (!result || !result.items) throw new Error("Backend returned no items wrapper.");
-        const mappedItems: InventoryItem[] = result.items.map(mapProductRecordToInventoryItem);
-        setItems(mappedItems);
-      } catch (e: any) {
-        window.dispatchEvent(new CustomEvent('app-error', {
-          detail: { title: "Inventory Fetch Error", message: e.message || String(e) }
-        }));
-        console.error("Failed to load inventory API:", e);
-      } finally {
-        setIsLoading(false);
-      }
+        allProducts.push(...result.items);
+        totalPages = result.totalPages;
+        page += 1;
+      } while (page <= totalPages);
+
+      const mappedItems: InventoryItem[] = await Promise.all(
+        allProducts.map(async (product) => {
+          const batches = await window.api.inventory.listBatches(product.id);
+          return {
+            ...mapProductRecordToInventoryItem(product),
+            batches: batches.map((batch: ProductBatchRecord) => mapBatchRecordToInventoryBatch(batch)),
+          };
+        }),
+      );
+      setItems(mappedItems);
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Inventory Fetch Error", message: e.message || String(e) }
+      }));
+      console.error("Failed to load inventory API:", e);
+    } finally {
+      setIsLoading(false);
     }
-    fetchInventory();
+  };
+
+  useEffect(() => {
+    void loadInventory();
   }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -84,13 +95,27 @@ export function Inventory() {
   const [restockFilter, setRestockFilter] = useState<"All" | "Out of Stock" | "Low Stock">("All");
   const [expiryFilter, setExpiryFilter] = useState<"All" | "expired" | "critical" | "warning" | "monitor">("All");
 
-  const handleDelete = (item: InventoryItem) => {
-    setItems(prev => prev.filter(i => i.id !== item.id));
-    setDeleteConfirmItem(null);
+  const handleDelete = async (item: InventoryItem) => {
+    try {
+      await window.api.inventory.remove(item.id);
+      await loadInventory();
+      setDeleteConfirmItem(null);
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Delete Product Error", message: e.message || String(e) }
+      }));
+    }
   };
 
-  const handleToggleActive = (item: InventoryItem) => {
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, isActive: !i.isActive } : i));
+  const handleToggleActive = async (item: InventoryItem) => {
+    try {
+      await window.api.inventory.setActive(item.id, !item.isActive);
+      await loadInventory();
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Update Product Error", message: e.message || String(e) }
+      }));
+    }
   };
 
   const openAddModal = () => {
@@ -125,53 +150,70 @@ export function Inventory() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name) return;
     const ppu = parseInt(formData.piecesPerUnit) || 1;
     const totalStock = parseInt(formData.totalStockPieces) || 0;
-    const status = totalStock <= 0 ? "Out of Stock" : totalStock <= ppu ? "Low Stock" : "In Stock";
+    const discountValue = parseFloat(formData.discount);
 
-    if (editingItem) {
-      setItems(prev => prev.map(it => it.id === editingItem.id ? {
-        ...it,
-        code: formData.code, name: formData.name, genericName: formData.genericName,
-        manufacturer: formData.manufacturer, brandType: formData.brandType,
-        category: formData.category as ProductCategory, subCategory: formData.subCategory as any,
-        packagingUnit: formData.packagingUnit, baseUnit: formData.baseUnit,
-        piecesPerUnit: ppu, totalStockPieces: totalStock,
-        unitPriceCost: parseFloat(formData.unitPriceCost) || 0,
-        sellingPricePerUnit: parseFloat(formData.sellingPricePerUnit) || 0,
-        sellingPricePerPiece: parseFloat(formData.sellingPricePerPiece) || 0,
-        discount: parseFloat(formData.discount) || undefined,
-        status
-      } : it));
-    } else {
-      const newItem: InventoryItem = {
-        id: Date.now(), code: formData.code, name: formData.name,
-        genericName: formData.genericName, manufacturer: formData.manufacturer,
-        brandType: formData.brandType, category: formData.category as ProductCategory,
-        subCategory: formData.subCategory as any,
-        packagingUnit: formData.packagingUnit, baseUnit: formData.baseUnit,
-        piecesPerUnit: ppu, totalStockPieces: totalStock,
-        unitPriceCost: parseFloat(formData.unitPriceCost) || 0,
-        sellingPricePerUnit: parseFloat(formData.sellingPricePerUnit) || 0,
-        sellingPricePerPiece: parseFloat(formData.sellingPricePerPiece) || 0,
-        discount: parseFloat(formData.discount) || undefined,
-        status, salesCount: 0, isActive: true,
-        batches: formData.expiryDate ? [{
-          batchId: `B-${Date.now()}`,
-          lotNumber: formData.lotNumber || `LOT-${Date.now()}`,
-          manufacturingDate: formData.manufacturingDate || new Date().toISOString().split("T")[0],
-          expiryDate: formData.expiryDate,
-          stockPieces: totalStock,
-          receivedDate: new Date().toISOString().split("T")[0],
-        }] : []
-      };
-      setItems(prev => [newItem, ...prev]);
+    try {
+      if (editingItem) {
+        const payload: UpdateProductInput = {
+          code: formData.code,
+          name: formData.name,
+          genericName: formData.genericName || null,
+          manufacturerName: formData.manufacturer || null,
+          brandType: formData.brandType,
+          category: formData.category as ProductCategory,
+          subCategory: formData.subCategory as ProductSubCategory,
+          packagingUnit: formData.packagingUnit,
+          baseUnit: formData.baseUnit,
+          piecesPerUnit: ppu,
+          totalStockPieces: totalStock,
+          unitPriceCost: parseFloat(formData.unitPriceCost) || 0,
+          sellingPricePerUnit: parseFloat(formData.sellingPricePerUnit) || 0,
+          sellingPricePerPiece: parseFloat(formData.sellingPricePerPiece) || 0,
+          discount: Number.isFinite(discountValue) ? discountValue : null,
+          isActive: editingItem.isActive,
+          salesCount: editingItem.salesCount,
+        };
+        await window.api.inventory.update(editingItem.id, payload);
+      } else {
+        const payload: CreateProductInput = {
+          code: formData.code,
+          name: formData.name,
+          genericName: formData.genericName || null,
+          manufacturerName: formData.manufacturer || null,
+          brandType: formData.brandType,
+          category: formData.category as ProductCategory,
+          subCategory: formData.subCategory as ProductSubCategory,
+          packagingUnit: formData.packagingUnit,
+          baseUnit: formData.baseUnit,
+          piecesPerUnit: ppu,
+          totalStockPieces: totalStock,
+          unitPriceCost: parseFloat(formData.unitPriceCost) || 0,
+          sellingPricePerUnit: parseFloat(formData.sellingPricePerUnit) || 0,
+          sellingPricePerPiece: parseFloat(formData.sellingPricePerPiece) || 0,
+          discount: Number.isFinite(discountValue) ? discountValue : null,
+          initialBatch: formData.expiryDate ? {
+            lotNumber: formData.lotNumber || `LOT-${Date.now()}`,
+            manufacturingDate: formData.manufacturingDate || new Date().toISOString().split("T")[0],
+            expiryDate: formData.expiryDate,
+            stockPieces: totalStock,
+            receivedDate: new Date().toISOString().split("T")[0],
+          } : undefined,
+        };
+        await window.api.inventory.create(payload);
+      }
+      await loadInventory();
+      setIsModalOpen(false);
+      setEditingItem(null);
+      setFormData(emptyForm());
+    } catch (e: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Save Product Error", message: e.message || String(e) }
+      }));
     }
-    setIsModalOpen(false);
-    setEditingItem(null);
-    setFormData(emptyForm());
   };
 
   // Memoized filtering — safe for 10,000+ products
@@ -484,7 +526,7 @@ export function Inventory() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
               {/* Low Stock */}
               {(lowStockTotal > 0 || restockFilter !== "All") && (
-                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[280px]">
+                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-70">
                   <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
                     <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
                       <div className="flex items-center gap-2"><Package className="w-4 h-4 text-orange-500" /> Needed to Restock</div>
@@ -527,7 +569,7 @@ export function Inventory() {
               
               {/* Expiring Soon */}
               {(expiringTotal > 0 || expiryFilter !== "All") && (
-                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-[280px]">
+                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-70">
                   <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
                     <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
                       <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500" /> Expiring Soon / Expired</div>
@@ -619,7 +661,7 @@ export function Inventory() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-3 md:p-6 bg-slate-50/50 min-h-[400px]">
+          <CardContent className="p-3 md:p-6 bg-slate-50/50 min-h-100">
 
             {viewMode === "list" ? (
               <div className="relative w-full overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm">
@@ -662,7 +704,7 @@ export function Inventory() {
                               "transition-colors group cursor-pointer",
                               rowBorderClass,
                               !item.isActive ? "opacity-50 bg-slate-50" : "hover:bg-slate-50/80",
-                              isExpanded && "bg-brand-blue/[0.03]"
+                              isExpanded && "bg-brand-blue/3"
                             )}>
                             {/* Product */}
                             <td className="px-4 py-3">

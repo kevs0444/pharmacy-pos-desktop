@@ -3,7 +3,7 @@ import {
   ChevronRight, TriangleAlert, Plus, Baby, Droplets, Package, AlertOctagon
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { InventoryItem, getNextBatch, getExpiryStatus, daysUntilExpiry, getSellableBatches } from "../lib/mockData";
+import { InventoryItem, getNextBatch, getExpiryStatus, daysUntilExpiry, getSellableBatches } from "../lib/inventoryModel";
 
 // ─── Category Icon ──────────────────────────────────────────────────────────
 export function getCategoryIcon(category: string) {

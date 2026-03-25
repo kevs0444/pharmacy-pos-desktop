@@ -3,6 +3,8 @@ import type {
   ManufacturerRecord,
   OrderPriority,
   OrderStatus,
+  ProductBatchRecord,
+  ProductBrandType,
   ProductCategory,
   ProductRecord,
   ProductSubCategory,
@@ -43,6 +45,55 @@ export interface InventorySummary {
   nearExpiryProducts: number
 }
 
+export interface ProductBatchInput {
+  lotNumber: string
+  manufacturingDate?: string | null
+  expiryDate: string
+  stockPieces: number
+  receivedDate?: string | null
+}
+
+export interface CreateProductInput {
+  code: string
+  name: string
+  genericName?: string | null
+  manufacturerName?: string | null
+  brandType: ProductBrandType
+  category: ProductCategory
+  subCategory: ProductSubCategory
+  packagingUnit: string
+  baseUnit: string
+  piecesPerUnit: number
+  totalStockPieces: number
+  unitPriceCost: number
+  sellingPricePerUnit: number
+  sellingPricePerPiece: number
+  discount?: number | null
+  isActive?: boolean
+  salesCount?: number
+  initialBatch?: ProductBatchInput
+}
+
+export interface UpdateProductInput {
+  code: string
+  name: string
+  genericName?: string | null
+  manufacturerName?: string | null
+  brandType: ProductBrandType
+  category: ProductCategory
+  subCategory: ProductSubCategory
+  packagingUnit: string
+  baseUnit: string
+  piecesPerUnit: number
+  totalStockPieces: number
+  unitPriceCost: number
+  sellingPricePerUnit: number
+  sellingPricePerPiece: number
+  discount?: number | null
+  isActive: boolean
+  salesCount: number
+}
+
 export interface OrderListQuery extends PaginationQuery {
   search?: string
   manufacturer?: string
@@ -65,6 +116,11 @@ export interface PharmacyApi {
   inventory: {
     list: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
     getSummary: () => Promise<InventorySummary>
+    create: (payload: CreateProductInput) => Promise<ProductRecord>
+    update: (id: number, payload: UpdateProductInput) => Promise<ProductRecord>
+    remove: (id: number) => Promise<void>
+    setActive: (id: number, isActive: boolean) => Promise<ProductRecord>
+    listBatches: (productId: number) => Promise<ProductBatchRecord[]>
   }
   pos: {
     listCatalog: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
