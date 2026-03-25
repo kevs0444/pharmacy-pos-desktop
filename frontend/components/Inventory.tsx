@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
-import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
+import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle, Clock, Truck } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
 import type { CreateProductInput, UpdateProductInput } from "../../backend/types/api";
@@ -37,6 +37,7 @@ const emptyForm = () => ({
 export function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [alertTab, setAlertTab] = useState<"restock" | "expiring" | "pending">("restock");
 
   const loadInventory = async () => {
     setIsLoading(true);
@@ -91,9 +92,6 @@ export function Inventory() {
   const [formData, setFormData] = useState(emptyForm());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
-  
-  const [restockFilter, setRestockFilter] = useState<"All" | "Out of Stock" | "Low Stock">("All");
-  const [expiryFilter, setExpiryFilter] = useState<"All" | "expired" | "critical" | "warning" | "monitor">("All");
 
   const handleDelete = async (item: InventoryItem) => {
     try {
@@ -511,49 +509,108 @@ export function Inventory() {
            onToggleSort={onToggleSort}
         />
 
-        {/* Inventory Alerts Widget */}
+        {/* Smart Inventory Alerts Widget */}
         {(() => {
-          let lowStock = items.filter(i => i.status === "Out of Stock" || i.status === "Low Stock");
-          const lowStockTotal = lowStock.length;
-          if (restockFilter !== "All") lowStock = lowStock.filter(i => i.status === restockFilter);
-
-          let expiringSoon = items.filter(i => {
+          const needsRestock = items.filter(i => i.isActive && (i.status === "Out of Stock" || i.status === "Low Stock"));
+          const expiringSoon = items.filter(i => {
+            if (!i.isActive) return false;
             const exp = getExpiryStatus(i);
-            return exp === "expired" || exp === "critical" || exp === "warning" || exp === "monitor";
+            return exp === "expired" || exp === "critical" || exp === "warning";
           });
-          const expiringTotal = expiringSoon.length;
-          if (expiryFilter !== "All") {
-            expiringSoon = expiringSoon.filter(i => getExpiryStatus(i) === expiryFilter.toLowerCase());
-          }
+          const pendingReceipt: InventoryItem[] = []; // Will be populated from orders API
           
-          if (lowStockTotal === 0 && expiringTotal === 0) return null;
+          const hasAlerts = needsRestock.length > 0 || expiringSoon.length > 0 || pendingReceipt.length > 0;
+          
+          if (!hasAlerts) return null;
           
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
-              {/* Low Stock */}
-              {(lowStockTotal > 0 || restockFilter !== "All") && (
-                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-70">
-                  <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
-                    <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
-                      <div className="flex items-center gap-2"><Package className="w-4 h-4 text-orange-500" /> Needed to Restock</div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                          <button onClick={() => setRestockFilter("All")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "All" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>All</button>
-                          <button onClick={() => setRestockFilter("Out of Stock")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "Out of Stock" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Out</button>
-                          <button onClick={() => setRestockFilter("Low Stock")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", restockFilter === "Low Stock" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Low</button>
-                        </div>
-                        <span className="bg-slate-100 text-slate-500 font-bold py-0.5 px-2 rounded-full text-[10px]">{lowStock.length}</span>
+            <Card className="border-slate-200 bg-white shadow-sm overflow-hidden mb-4">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 bg-linear-to-r from-brand-blue/5 to-brand-teal/5">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    Smart Inventory Alerts
+                  </CardTitle>
+                  <div className="flex gap-1 bg-white rounded-lg p-1 border border-slate-200">
+                    <button
+                      onClick={() => setAlertTab("restock")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                        alertTab === "restock"
+                          ? "bg-orange-500 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      Restock
+                      {needsRestock.length > 0 && (
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
+                          alertTab === "restock" ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-600"
+                        )}>
+                          {needsRestock.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setAlertTab("expiring")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                        alertTab === "expiring"
+                          ? "bg-red-500 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      Expiring
+                      {expiringSoon.length > 0 && (
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
+                          alertTab === "expiring" ? "bg-red-600 text-white" : "bg-red-100 text-red-600"
+                        )}>
+                          {expiringSoon.length}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setAlertTab("pending")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
+                        alertTab === "pending"
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      Pending
+                      {pendingReceipt.length > 0 && (
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
+                          alertTab === "pending" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-600"
+                        )}>
+                          {pendingReceipt.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 max-h-72 overflow-y-auto custom-scrollbar">
+                {/* Needs Restock Tab */}
+                {alertTab === "restock" && (
+                  <div className="divide-y divide-slate-100">
+                    {needsRestock.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p className="font-bold">All products are well-stocked!</p>
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="divide-y divide-slate-100">
-                      {lowStock.map(item => {
+                    ) : (
+                      needsRestock.map(item => {
                         const Icon = getCategoryIcon(item.category);
                         return (
-                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-orange-50/50 transition-colors cursor-pointer group">
                             <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="w-10 h-10 shrink-0 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform">
+                              <div className="w-10 h-10 shrink-0 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform">
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div className="overflow-hidden">
@@ -566,46 +623,78 @@ export function Inventory() {
                               <p className="text-[9px] font-extrabold text-orange-400 uppercase tracking-widest leading-none mt-0.5">{item.status}</p>
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Expiring Soon */}
-              {(expiringTotal > 0 || expiryFilter !== "All") && (
-                <Card className="border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-70">
-                  <CardHeader className="py-3 px-4 border-b border-slate-100 bg-white shrink-0">
-                    <CardTitle className="text-xs font-extrabold text-slate-800 uppercase flex items-center justify-between tracking-widest">
-                      <div className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500" /> Expiring Soon / Expired</div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                          <button onClick={() => setExpiryFilter("All")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "All" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>All</button>
-                          <button onClick={() => setExpiryFilter("expired")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "expired" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>Expired</button>
-                          <button onClick={() => setExpiryFilter("critical")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "critical" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤3 mo</button>
-                          <button onClick={() => setExpiryFilter("warning")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "warning" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤6 mo</button>
-                          <button onClick={() => setExpiryFilter("monitor")} className={cn("px-2 py-0.5 text-[9px] font-extrabold rounded-md transition-all uppercase tracking-wider", expiryFilter === "monitor" ? "bg-white shadow-sm text-slate-800" : "text-slate-500 hover:text-slate-700")}>≤1 yr</button>
-                        </div>
-                        <span className="bg-slate-100 text-slate-500 font-bold py-0.5 px-2 rounded-full text-[10px]">{expiringSoon.length}</span>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* Expiring Soon Tab */}
+                {alertTab === "expiring" && (
+                  <div className="divide-y divide-slate-100">
+                    {expiringSoon.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p className="font-bold">No products expiring soon!</p>
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0 flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="divide-y divide-slate-100">
-                      {expiringSoon.map(item => {
+                    ) : (
+                      expiringSoon.map(item => {
                         const Icon = getCategoryIcon(item.category);
                         const expStatus = getExpiryStatus(item);
                         const isExpired = expStatus === "expired";
+                        const nextBatch = getNextBatch(item);
                         return (
-                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
+                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-red-50/50 transition-colors cursor-pointer group">
                             <div className="flex items-center gap-3 overflow-hidden">
                               <div className={cn("w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform", 
                                 isExpired ? "bg-red-50 border-red-200 text-red-600" : 
                                 expStatus === "critical" ? "bg-red-50 border-red-200 text-red-500" :
-                                expStatus === "warning" ? "bg-orange-50 border-orange-200 text-orange-500" :
-                                "bg-yellow-50 border-yellow-200 text-yellow-600"
+                                "bg-orange-50 border-orange-200 text-orange-500"
                               )}>
+                                <Icon className="w-5 h-5" />
+                              </div>
+                              <div className="overflow-hidden">
+                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                                  Lot: {nextBatch?.lotNumber || "N/A"} • Exp: {nextBatch?.expiryDate || "N/A"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <p className={cn("font-black text-sm tracking-tight", 
+                                isExpired || expStatus === "critical" ? "text-red-600" : "text-orange-500"
+                              )}>
+                                {isExpired ? "EXPIRED" : `${daysUntilExpiry(nextBatch?.expiryDate || "")}d left`}
+                              </p>
+                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", 
+                                isExpired || expStatus === "critical" ? "text-red-400" : "text-orange-400"
+                              )}>
+                                {isExpired ? "Remove Now" : "Act Soon"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+
+                {/* Pending Receipt Tab */}
+                {alertTab === "pending" && (
+                  <div className="divide-y divide-slate-100">
+                    {pendingReceipt.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <Truck className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p className="font-bold">No pending deliveries to receive</p>
+                        <p className="text-xs mt-1">Products from delivered orders will appear here</p>
+                      </div>
+                    ) : (
+                      pendingReceipt.map(item => {
+                        const Icon = getCategoryIcon(item.category);
+                        return (
+                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-blue-50/50 transition-colors cursor-pointer group">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-500 group-hover:scale-105 transition-transform">
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div className="overflow-hidden">
@@ -614,29 +703,17 @@ export function Inventory() {
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-3">
-                              <p className={cn("font-black text-sm tracking-tight", 
-                                isExpired || expStatus === "critical" ? "text-red-600" : 
-                                expStatus === "warning" ? "text-orange-500" : 
-                                "text-yellow-600"
-                              )}>
-                                {isExpired ? "EXPIRED" : `${daysUntilExpiry(getNextBatch(item)?.expiryDate || "")}d left`}
-                              </p>
-                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", 
-                                isExpired || expStatus === "critical" ? "text-red-400" : 
-                                expStatus === "warning" ? "text-orange-400" : 
-                                "text-yellow-500"
-                              )}>
-                                {isExpired ? "Pull from shelf" : expStatus === "critical" ? "Critical Expiry" : expStatus === "warning" ? "Warning" : "Monitor"}
-                              </p>
+                              <p className="font-black text-blue-600 text-xs tracking-tight uppercase">Ready</p>
+                              <p className="text-[9px] font-extrabold text-blue-400 uppercase tracking-widest leading-none mt-0.5">Receive Stock</p>
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           );
         })()}
 

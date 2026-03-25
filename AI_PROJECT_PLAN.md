@@ -155,7 +155,8 @@ flowchart TD
 - [x] Implement normalized tables for products, product batches, and inventory movements
 - [x] Build product CRUD services with validation for packaging hierarchy, pricing, and active status
 - [x] Implement batch receiving flows with lot number, manufacturing date, expiry date, and received date
-- [ ] Enforce FEFO queries for stock selection and near-expiry monitoring
+- [x] Build smart inventory alerts API for needs-restock, expiring-soon, and pending-receipt monitoring
+- [ ] Enforce FEFO queries for stock selection in POS checkout
 - [ ] Introduce stock adjustment services for corrections, damaged stock, and manual recounts
 - [x] Record every stock-affecting action in an inventory movement ledger
 
@@ -163,12 +164,16 @@ flowchart TD
 - [x] Connect Inventory list and card views to real paginated SQLite queries
 - [x] Connect Add, Edit, Disable, Enable, and Delete flows to backend APIs
 - [x] Add UI for receiving new stock batches and reviewing existing batches
-- [ ] Replace mock low-stock and near-expiry widgets with live backend-powered results
+- [x] Implement smart inventory dashboard with swipable/tabbable containers for:
+  - **Needs Restock**: Products with low or out-of-stock status
+  - **Expiring Soon**: Products with batches expiring within 90 days
+  - **Pending Receipt**: Products from delivered orders ready to be received into inventory
 - [x] Keep sorting, filtering, and pagination behavior consistent with the validated prototype
 
 #### Exit Criteria
 - [x] Inventory reflects real SQLite records instead of mock state
 - [x] FEFO-aware batch data is fully operational
+- [x] Smart inventory alerts provide actionable insights for pharmacy staff
 - [x] Every stock movement is traceable and reviewable
 
 ---

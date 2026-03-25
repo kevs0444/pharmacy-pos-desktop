@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { OrderListQuery, PaginatedResult } from '../types/api'
-import type { PurchaseOrderRecord } from '../types/domain'
+import type { OrderStatus, PurchaseOrderRecord } from '../types/domain'
 import { buildPaginatedResult, escapeLike, normalizePagination } from './helpers'
 
 export class OrdersRepository {
@@ -77,5 +77,16 @@ export class OrdersRepository {
       .all(params) as PurchaseOrderRecord[]
 
     return buildPaginatedResult(items, totalRow.count, page, pageSize)
+  }
+
+  updateStatus(orderId: number, status: OrderStatus): void {
+    const timestamp = new Date().toISOString()
+    const result = this.db
+      .prepare('UPDATE purchase_orders SET status = @status, updated_at = @updatedAt WHERE id = @id')
+      .run({ id: orderId, status, updatedAt: timestamp })
+
+    if (result.changes === 0) {
+      throw new Error(`Purchase order with ID ${orderId} not found`)
+    }
   }
 }

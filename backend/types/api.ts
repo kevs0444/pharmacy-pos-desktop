@@ -45,6 +45,12 @@ export interface InventorySummary {
   nearExpiryProducts: number
 }
 
+export interface InventoryAlerts {
+  needsRestock: ProductRecord[]
+  expiringSoon: ProductRecord[]
+  pendingReceipt: ProductRecord[]
+}
+
 export interface ProductBatchInput {
   lotNumber: string
   manufacturingDate?: string | null
@@ -116,17 +122,20 @@ export interface PharmacyApi {
   inventory: {
     list: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
     getSummary: () => Promise<InventorySummary>
+    getAlerts: () => Promise<InventoryAlerts>
     create: (payload: CreateProductInput) => Promise<ProductRecord>
     update: (id: number, payload: UpdateProductInput) => Promise<ProductRecord>
     remove: (id: number) => Promise<void>
     setActive: (id: number, isActive: boolean) => Promise<ProductRecord>
     listBatches: (productId: number) => Promise<ProductBatchRecord[]>
+    receiveBatch: (productId: number, batch: ProductBatchInput) => Promise<void>
   }
   pos: {
     listCatalog: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
   }
   orders: {
     list: (query?: OrderListQuery) => Promise<PaginatedResult<PurchaseOrderRecord>>
+    updateStatus: (orderId: number, status: OrderStatus) => Promise<void>
   }
   admin: {
     listUsers: (query?: AdminUserListQuery) => Promise<PaginatedResult<Omit<UserRecord, 'passwordHash'>>>

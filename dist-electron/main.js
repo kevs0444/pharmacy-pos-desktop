@@ -587,6 +587,9 @@ class InventoryService {
   getSummary() {
     return this.inventoryRepository.getSummary();
   }
+  getAlerts() {
+    return this.inventoryRepository.getAlerts();
+  }
   create(input) {
     return this.inventoryRepository.create(input);
   }
@@ -602,6 +605,9 @@ class InventoryService {
   listBatches(productId) {
     return this.inventoryRepository.listBatches(productId);
   }
+  receiveBatch(productId, batch) {
+    this.inventoryRepository.receiveBatch(productId, batch);
+  }
 }
 class OrdersService {
   constructor(ordersRepository) {
@@ -609,6 +615,9 @@ class OrdersService {
   }
   list(query) {
     return this.ordersRepository.list(query);
+  }
+  updateStatus(orderId, status) {
+    this.ordersRepository.updateStatus(orderId, status);
   }
 }
 class PosService {
@@ -667,12 +676,6 @@ function escapeLike(value) {
 class InventoryRepository {
   constructor(db) {
     this.db = db;
-    try {
-      const count = this.db.prepare("SELECT COUNT(*) as c FROM products").get();
-      console.log(`[DEBUG] InventoryRepository initialized. Total products in entire DB: ${count.c}`);
-    } catch (e) {
-      console.error(`[DEBUG] Failed to count products:`, e);
-    }
   }
   list(query) {
     var _a;
@@ -755,7 +758,6 @@ class InventoryRepository {
         LIMIT @limit OFFSET @offset
       `).all(params);
     const items = rows.map((row) => this.mapProduct(row));
-    console.log(`[DEBUG] Fetched ${items.length} items from the database! Total matched: ${totalRow.count}`);
     return buildPaginatedResult(items, totalRow.count, page, pageSize);
   }
   getSummary() {
@@ -1099,6 +1101,174 @@ class InventoryRepository {
       isActive: Boolean(row.isActive)
     };
   }
+  getAlerts() {
+    const needsRestockRows = this.db.prepare(`
+        SELECT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          NULL AS nextBatchLotNumber,
+          NULL AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        WHERE p.is_active = 1
+          AND (p.status = 'Low Stock' OR p.status = 'Out of Stock')
+        ORDER BY p.total_stock_pieces ASC
+        LIMIT 20
+      `).all();
+    const expiringSoonRows = this.db.prepare(`
+        SELECT DISTINCT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          pb.lot_number AS nextBatchLotNumber,
+          pb.expiry_date AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        INNER JOIN product_batches pb ON pb.product_id = p.id
+        WHERE p.is_active = 1
+          AND pb.is_active = 1
+          AND pb.stock_pieces > 0
+          AND date(pb.expiry_date) > date('now')
+          AND date(pb.expiry_date) <= date('now', '+90 days')
+        ORDER BY date(pb.expiry_date) ASC
+        LIMIT 20
+      `).all();
+    const pendingReceiptRows = this.db.prepare(`
+        SELECT DISTINCT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          NULL AS nextBatchLotNumber,
+          NULL AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        INNER JOIN purchase_order_items poi ON poi.product_id = p.id
+        INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+        WHERE po.status = 'Delivered'
+          AND p.is_active = 1
+        ORDER BY po.updated_at DESC
+        LIMIT 20
+      `).all();
+    return {
+      needsRestock: needsRestockRows.map((row) => this.mapProduct(row)),
+      expiringSoon: expiringSoonRows.map((row) => this.mapProduct(row)),
+      pendingReceipt: pendingReceiptRows.map((row) => this.mapProduct(row))
+    };
+  }
+  receiveBatch(productId, batch) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const receiveTxn = this.db.transaction(() => {
+      const product = this.db.prepare("SELECT id, pieces_per_unit, total_stock_pieces FROM products WHERE id = ?").get(productId);
+      if (!product) {
+        throw new Error(`Product with ID ${productId} not found`);
+      }
+      const batchCode = `B-${productId}-${Date.now()}`;
+      const insertBatch = this.db.prepare(`
+        INSERT INTO product_batches (
+          product_id, batch_code, lot_number, manufacturing_date, expiry_date,
+          stock_pieces, received_date, is_active, created_at, updated_at
+        ) VALUES (
+          @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
+          @stockPieces, @receivedDate, 1, @createdAt, @updatedAt
+        )
+      `);
+      const batchResult = insertBatch.run({
+        productId,
+        batchCode,
+        lotNumber: batch.lotNumber,
+        manufacturingDate: batch.manufacturingDate ?? null,
+        expiryDate: batch.expiryDate,
+        stockPieces: batch.stockPieces,
+        receivedDate: batch.receivedDate ?? timestamp.slice(0, 10),
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      const batchId = Number(batchResult.lastInsertRowid);
+      const newTotalStock = product.total_stock_pieces + batch.stockPieces;
+      const newStatus = this.computeStatus(newTotalStock, product.pieces_per_unit);
+      this.db.prepare(`
+        UPDATE products
+        SET total_stock_pieces = @totalStockPieces,
+            status = @status,
+            updated_at = @updatedAt
+        WHERE id = @id
+      `).run({
+        id: productId,
+        totalStockPieces: newTotalStock,
+        status: newStatus,
+        updatedAt: timestamp
+      });
+      this.db.prepare(`
+        INSERT INTO inventory_movements (
+          product_id, product_batch_id, movement_type, quantity_pieces, reference_type,
+          reference_id, reason, performed_by_user_id, created_at
+        ) VALUES (
+          @productId, @productBatchId, 'RECEIVE', @quantityPieces, 'BATCH_RECEIPT',
+          @referenceId, @reason, NULL, @createdAt
+        )
+      `).run({
+        productId,
+        productBatchId: batchId,
+        quantityPieces: batch.stockPieces,
+        referenceId: batchCode,
+        reason: `Received batch ${batch.lotNumber}`,
+        createdAt: timestamp
+      });
+    });
+    receiveTxn();
+  }
 }
 class ManufacturersRepository {
   constructor(db) {
@@ -1203,6 +1373,13 @@ class OrdersRepository {
         LIMIT @limit OFFSET @offset
       `).all(params);
     return buildPaginatedResult(items, totalRow.count, page, pageSize);
+  }
+  updateStatus(orderId, status) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const result = this.db.prepare("UPDATE purchase_orders SET status = @status, updated_at = @updatedAt WHERE id = @id").run({ id: orderId, status, updatedAt: timestamp });
+    if (result.changes === 0) {
+      throw new Error(`Purchase order with ID ${orderId} not found`);
+    }
   }
 }
 class SettingsRepository {
@@ -1337,6 +1514,7 @@ function registerIpcHandlers(services) {
   registerHandler("system:getStatus", () => services.systemService.getStatus());
   registerHandler("inventory:list", (query) => services.inventoryService.list(query));
   registerHandler("inventory:getSummary", () => services.inventoryService.getSummary());
+  registerHandler("inventory:getAlerts", () => services.inventoryService.getAlerts());
   registerHandler("inventory:create", (payload) => services.inventoryService.create(payload));
   registerHandler(
     "inventory:update",
@@ -1348,8 +1526,16 @@ function registerIpcHandlers(services) {
     ({ id, isActive }) => services.inventoryService.setActive(id, isActive)
   );
   registerHandler("inventory:listBatches", (productId) => services.inventoryService.listBatches(productId));
+  registerHandler(
+    "inventory:receiveBatch",
+    ({ productId, batch }) => services.inventoryService.receiveBatch(productId, batch)
+  );
   registerHandler("pos:listCatalog", (query) => services.posService.listCatalog(query));
   registerHandler("orders:list", (query) => services.ordersService.list(query));
+  registerHandler(
+    "orders:updateStatus",
+    ({ orderId, status }) => services.ordersService.updateStatus(orderId, status)
+  );
   registerHandler("admin:listUsers", (query) => services.adminService.listUsers(query));
   registerHandler("admin:listManufacturers", () => services.adminService.listManufacturers());
   registerHandler("admin:createManufacturer", (payload) => services.adminService.createManufacturer(payload));

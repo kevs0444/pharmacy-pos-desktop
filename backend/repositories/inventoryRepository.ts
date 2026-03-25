@@ -1,9 +1,11 @@
 import type Database from 'better-sqlite3'
 import type {
   CreateProductInput,
+  InventoryAlerts,
   InventoryListQuery,
   InventorySummary,
   PaginatedResult,
+  ProductBatchInput,
   UpdateProductInput,
 } from '../types/api'
 import type { ProductBatchRecord, ProductRecord } from '../types/domain'
@@ -519,6 +521,204 @@ export class InventoryRepository {
       ...row,
       isActive: Boolean(row.isActive),
     }
+  }
+
+  getAlerts(): InventoryAlerts {
+    // Products that need restocking (low or out of stock)
+    const needsRestockRows = this.db
+      .prepare(`
+        SELECT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          NULL AS nextBatchLotNumber,
+          NULL AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        WHERE p.is_active = 1
+          AND (p.status = 'Low Stock' OR p.status = 'Out of Stock')
+        ORDER BY p.total_stock_pieces ASC
+        LIMIT 20
+      `)
+      .all() as ProductRow[]
+
+    // Products expiring soon (within 90 days)
+    const expiringSoonRows = this.db
+      .prepare(`
+        SELECT DISTINCT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          pb.lot_number AS nextBatchLotNumber,
+          pb.expiry_date AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        INNER JOIN product_batches pb ON pb.product_id = p.id
+        WHERE p.is_active = 1
+          AND pb.is_active = 1
+          AND pb.stock_pieces > 0
+          AND date(pb.expiry_date) > date('now')
+          AND date(pb.expiry_date) <= date('now', '+90 days')
+        ORDER BY date(pb.expiry_date) ASC
+        LIMIT 20
+      `)
+      .all() as ProductRow[]
+
+    // Products from delivered orders waiting to be received into inventory
+    // (This is a placeholder - will be enhanced when order-to-inventory flow is implemented)
+    const pendingReceiptRows = this.db
+      .prepare(`
+        SELECT DISTINCT
+          p.id,
+          p.code,
+          p.name,
+          p.generic_name AS genericName,
+          p.manufacturer_id AS manufacturerId,
+          m.name AS manufacturerName,
+          p.brand_type AS brandType,
+          p.category,
+          p.sub_category AS subCategory,
+          p.packaging_unit AS packagingUnit,
+          p.base_unit AS baseUnit,
+          p.pieces_per_unit AS piecesPerUnit,
+          p.total_stock_pieces AS totalStockPieces,
+          p.unit_price_cost AS unitPriceCost,
+          p.selling_price_per_unit AS sellingPricePerUnit,
+          p.selling_price_per_piece AS sellingPricePerPiece,
+          p.discount,
+          p.is_active AS isActive,
+          p.sales_count AS salesCount,
+          p.status,
+          NULL AS nextBatchLotNumber,
+          NULL AS nextBatchExpiryDate
+        FROM products p
+        LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
+        INNER JOIN purchase_order_items poi ON poi.product_id = p.id
+        INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+        WHERE po.status = 'Delivered'
+          AND p.is_active = 1
+        ORDER BY po.updated_at DESC
+        LIMIT 20
+      `)
+      .all() as ProductRow[]
+
+    return {
+      needsRestock: needsRestockRows.map((row) => this.mapProduct(row)),
+      expiringSoon: expiringSoonRows.map((row) => this.mapProduct(row)),
+      pendingReceipt: pendingReceiptRows.map((row) => this.mapProduct(row)),
+    }
+  }
+
+  receiveBatch(productId: number, batch: ProductBatchInput): void {
+    const timestamp = new Date().toISOString()
+    
+    const receiveTxn = this.db.transaction(() => {
+      // Verify product exists
+      const product = this.db
+        .prepare('SELECT id, pieces_per_unit, total_stock_pieces FROM products WHERE id = ?')
+        .get(productId) as { id: number; pieces_per_unit: number; total_stock_pieces: number } | undefined
+
+      if (!product) {
+        throw new Error(`Product with ID ${productId} not found`)
+      }
+
+      // Create batch
+      const batchCode = `B-${productId}-${Date.now()}`
+      const insertBatch = this.db.prepare(`
+        INSERT INTO product_batches (
+          product_id, batch_code, lot_number, manufacturing_date, expiry_date,
+          stock_pieces, received_date, is_active, created_at, updated_at
+        ) VALUES (
+          @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
+          @stockPieces, @receivedDate, 1, @createdAt, @updatedAt
+        )
+      `)
+
+      const batchResult = insertBatch.run({
+        productId,
+        batchCode,
+        lotNumber: batch.lotNumber,
+        manufacturingDate: batch.manufacturingDate ?? null,
+        expiryDate: batch.expiryDate,
+        stockPieces: batch.stockPieces,
+        receivedDate: batch.receivedDate ?? timestamp.slice(0, 10),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+
+      const batchId = Number(batchResult.lastInsertRowid)
+
+      // Update product total stock
+      const newTotalStock = product.total_stock_pieces + batch.stockPieces
+      const newStatus = this.computeStatus(newTotalStock, product.pieces_per_unit)
+
+      this.db.prepare(`
+        UPDATE products
+        SET total_stock_pieces = @totalStockPieces,
+            status = @status,
+            updated_at = @updatedAt
+        WHERE id = @id
+      `).run({
+        id: productId,
+        totalStockPieces: newTotalStock,
+        status: newStatus,
+        updatedAt: timestamp,
+      })
+
+      // Record inventory movement
+      this.db.prepare(`
+        INSERT INTO inventory_movements (
+          product_id, product_batch_id, movement_type, quantity_pieces, reference_type,
+          reference_id, reason, performed_by_user_id, created_at
+        ) VALUES (
+          @productId, @productBatchId, 'RECEIVE', @quantityPieces, 'BATCH_RECEIPT',
+          @referenceId, @reason, NULL, @createdAt
+        )
+      `).run({
+        productId,
+        productBatchId: batchId,
+        quantityPieces: batch.stockPieces,
+        referenceId: batchCode,
+        reason: `Received batch ${batch.lotNumber}`,
+        createdAt: timestamp,
+      })
+    })
+
+    receiveTxn()
   }
 
 }

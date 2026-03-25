@@ -1,8 +1,10 @@
 import type {
   CreateProductInput,
+  InventoryAlerts,
   InventoryListQuery,
   InventorySummary,
   PaginatedResult,
+  ProductBatchInput,
   UpdateProductInput,
 } from '../types/api'
 import type { ProductBatchRecord, ProductRecord } from '../types/domain'
@@ -17,6 +19,10 @@ export class InventoryService {
 
   getSummary(): InventorySummary {
     return this.inventoryRepository.getSummary()
+  }
+
+  getAlerts(): InventoryAlerts {
+    return this.inventoryRepository.getAlerts()
   }
 
   create(input: CreateProductInput): ProductRecord {
@@ -37,5 +43,9 @@ export class InventoryService {
 
   listBatches(productId: number): ProductBatchRecord[] {
     return this.inventoryRepository.listBatches(productId)
+  }
+
+  receiveBatch(productId: number, batch: ProductBatchInput): void {
+    this.inventoryRepository.receiveBatch(productId, batch)
   }
 }
