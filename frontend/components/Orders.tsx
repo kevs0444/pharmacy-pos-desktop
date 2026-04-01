@@ -82,6 +82,7 @@ export function Orders() {
   const [filterOrderedBy, setFilterOrderedBy] = useState("All");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // newest first
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const inTransit  = orders.filter(o => o.status === "In Transit").length;
   const processing = orders.filter(o => o.status === "Processing").length;
@@ -222,60 +223,66 @@ export function Orders() {
           </button>
         </div>
 
-        {/* ── Status Summary Cards ── */}
+        {/* ── Status Summary Cards (Interactive Widgets) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
           {[
-            { label: "Processing",  count: processing, icon: Clock,         color: "bg-yellow-50 border-yellow-200 text-yellow-800", iconBg: "bg-yellow-100 text-yellow-700" },
-            { label: "In Transit",  count: inTransit,  icon: Truck,         color: "bg-blue-50   border-blue-200   text-blue-800",   iconBg: "bg-blue-100 text-blue-700" },
-            { label: "Delivered",   count: delivered,  icon: CheckCircle,   color: "bg-emerald-50 border-emerald-200 text-emerald-800", iconBg: "bg-emerald-100 text-emerald-700" },
-            { label: "Total Orders",count: orders.length,icon: Package,     color: "bg-slate-50  border-slate-200  text-slate-800",  iconBg: "bg-slate-100 text-slate-600" },
-          ].map(({ label, count, icon: Icon, color, iconBg }) => (
-            <Card key={label} className={cn("rounded-[1rem] shadow-sm border cursor-default", color)}>
-              <CardContent className="p-4 md:p-5 flex items-center gap-3">
-                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", iconBg)}><Icon className="w-4 h-4" /></div>
-                <div>
-                  <h3 className="text-xl md:text-2xl font-black">{count}</h3>
-                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            { label: "Processing",  count: processing, icon: Clock,         color: "bg-yellow-50 border-yellow-200 text-yellow-800", iconBg: "bg-yellow-100 text-yellow-700", ringColor: "ring-yellow-400" },
+            { label: "In Transit",  count: inTransit,  icon: Truck,         color: "bg-blue-50   border-blue-200   text-blue-800",   iconBg: "bg-blue-100 text-blue-700", ringColor: "ring-blue-400" },
+            { label: "Delivered",   count: delivered,  icon: CheckCircle,   color: "bg-emerald-50 border-emerald-200 text-emerald-800", iconBg: "bg-emerald-100 text-emerald-700", ringColor: "ring-emerald-400" },
+            { label: "Total Orders",count: orders.length,icon: Package,     color: "bg-slate-50  border-slate-200  text-slate-800",  iconBg: "bg-slate-100 text-slate-600", ringColor: "ring-slate-300" },
+          ].map(({ label, count, icon: Icon, color, iconBg, ringColor }) => {
+            const isActive = label === "Total Orders" ? filterStatus === "All" : filterStatus === label;
+            return (
+              <Card 
+                key={label} 
+                onClick={() => {
+                  setFilterStatus(label === "Total Orders" ? "All" : label as OrderStatus);
+                  resetPage();
+                }}
+                className={cn(
+                  "rounded-[1rem] shadow-sm border cursor-pointer transition-all duration-200", 
+                  color,
+                  isActive ? `ring-2 ring-offset-2 ${ringColor} scale-[1.02]` : "opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-md"
+                )}>
+                <CardContent className="p-4 md:p-5 flex items-center gap-3">
+                  <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", iconBg)}><Icon className="w-4 h-4" /></div>
+                  <div>
+                    <h3 className="text-xl md:text-2xl font-black">{count}</h3>
+                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {/* ── Orders Table/Card Area ── */}
-        <Card className="rounded-[1rem] shadow-sm border border-slate-200 overflow-hidden">
-          <CardHeader className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50">
-            <div className="flex flex-col gap-3">
-              {/* Top row: title + search + view toggle */}
+        {/* ── Order Filters (Extracted) ── */}
+        <Card className="rounded-[1rem] shadow-sm border border-slate-200 bg-white">
+          <CardContent className="p-4 md:p-5">
+            <div className="flex flex-col gap-4">
+              {/* Search & Action Row */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <CardTitle className="text-base md:text-lg font-extrabold text-slate-800">
-                  Supplier Order Queue
-                  <span className="ml-2 text-xs font-normal text-slate-400">({filteredOrders.length} orders)</span>
-                </CardTitle>
+                <div className="relative flex-1 sm:max-w-md">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
+                    placeholder="Search PO, manufacturer..." className="w-full pl-9 pr-4 py-2 flex-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-sm font-medium transition-all" />
+                </div>
                 <div className="flex items-center gap-2">
-                  {/* Search */}
-                  <div className="relative flex-1 sm:w-52">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
-                      placeholder="Search PO, manufacturer..." className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-xs font-medium transition-all" />
-                  </div>
-                  {/* Sort */}
                   <button onClick={() => { setSortOrder(p => p === "asc" ? "desc" : "asc"); resetPage(); }}
-                    className="p-2 rounded-lg bg-white border border-slate-200 hover:border-brand-blue/30 text-slate-500 hover:text-brand-blue transition-all" title="Toggle Sort">
+                    className="p-2 rounded-lg bg-slate-50 border border-slate-200 hover:border-brand-blue/30 text-slate-500 hover:text-brand-blue transition-all" title="Toggle Sort">
                     {sortOrder === "desc" ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
                   </button>
-                  {/* View Toggle */}
-                  <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 shrink-0">
+                  <div className="flex bg-slate-50 p-1 rounded-lg border border-slate-200 shrink-0">
                     <button onClick={() => { setViewMode("list"); resetPage(); }} className={cn("p-1.5 rounded-md transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")} title="List View"><List className="w-4 h-4" /></button>
                     <button onClick={() => { setViewMode("card"); resetPage(); }} className={cn("p-1.5 rounded-md transition-all", viewMode === "card" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")} title="Card View"><LayoutGrid className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
 
-              {/* Filter row */}
+              {/* Dropdown Filters Row */}
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter by:</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:inline-block">Filter by:</span>
 
                 <select value={filterManufacturer} onChange={e => { setFilterManufacturer(e.target.value); resetPage(); }} className={selectClass}>
                   <option value="All">🏭 All Manufacturers</option>
@@ -301,12 +308,22 @@ export function Orders() {
                 {/* Reset filters */}
                 {(filterManufacturer !== "All" || filterStatus !== "All" || filterPriority !== "All" || filterOrderedBy !== "All" || searchQuery) && (
                   <button onClick={() => { setFilterManufacturer("All"); setFilterStatus("All"); setFilterPriority("All"); setFilterOrderedBy("All"); setSearchQuery(""); resetPage(); }}
-                    className="text-[10px] font-black text-red-400 hover:text-red-600 uppercase tracking-wider flex items-center gap-1 transition-colors">
+                    className="text-[10px] sm:ml-auto font-black text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg uppercase tracking-wider flex items-center gap-1.5 transition-colors">
                     <X className="w-3 h-3" /> Clear
                   </button>
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Orders Table/Card Area ── */}
+        <Card className="border-t-4 border-t-brand-blue overflow-hidden rounded-[1rem] shadow-sm bg-white">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-3 bg-slate-50/50 border-b border-slate-100">
+             <CardTitle className="text-lg md:text-xl font-bold text-slate-800">
+               Supplier Order Queue
+               <span className="ml-2 text-sm font-normal text-slate-400">({filteredOrders.length} orders)</span>
+             </CardTitle>
           </CardHeader>
 
           <CardContent className="p-4 md:p-5 bg-slate-50/30 min-h-[300px]">
@@ -331,37 +348,92 @@ export function Orders() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pagedOrders.map((order, i) => {
+                    {pagedOrders.map((order) => {
                       const cfg = STATUS_CONFIG[order.status];
+                      const isExpanded = expandedOrderId === order.id;
+
                       return (
-                        <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
-                          <td className="px-4 py-3">
-                            <span className="font-mono font-bold text-brand-blue text-xs group-hover:underline">{order.id}</span>
-                            {order.priority === "Urgent" && <span className="ml-1.5 text-[8px] font-black uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded border border-red-200">Urgent</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="font-bold text-slate-700 text-xs">{order.manufacturer}</p>
-                            <p className="text-[10px] text-slate-400">{order.contactPerson}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="text-xs text-slate-600 font-medium">{order.items.length} item{order.items.length > 1 ? "s" : ""}</p>
-                            <p className="text-[10px] text-slate-400 truncate max-w-[160px]">{order.items[0]}{order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-                              <User className="w-3 h-3 text-slate-400" />{order.orderedBy}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={cn("text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border", cfg.color)}>{cfg.label}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="flex items-center gap-1 text-xs text-slate-500 font-medium"><Calendar className="w-3 h-3 text-slate-300" />{order.eta}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className="font-black text-slate-800 text-sm">₱{order.total.toLocaleString()}</span>
-                          </td>
-                        </tr>
+                        <>
+                          <tr key={order.id} 
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            className={cn(
+                              "hover:bg-slate-50/80 transition-colors group cursor-pointer",
+                              isExpanded && "bg-brand-blue/3"
+                            )}>
+                            <td className="px-4 py-3">
+                              <span className="font-mono font-bold text-brand-blue text-xs group-hover:underline">{order.id}</span>
+                              {order.priority === "Urgent" && <span className="ml-1.5 text-[8px] font-black uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded border border-red-200">Urgent</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-slate-700 text-xs">{order.manufacturer}</p>
+                              <p className="text-[10px] text-slate-400">{order.contactPerson || "—"}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-xs text-slate-600 font-medium">{order.items.length} item{order.items.length > 1 ? "s" : ""}</p>
+                              <p className="text-[10px] text-slate-400 truncate max-w-[160px]">{order.items[0]}{order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+                                <User className="w-3 h-3 text-slate-400" />{order.orderedBy}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={cn("text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border", cfg.color)}>{cfg.label}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="flex items-center gap-1 text-xs text-slate-500 font-medium"><Calendar className="w-3 h-3 text-slate-300" />{order.eta}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="font-black text-slate-800 text-sm">₱{order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </td>
+                          </tr>
+
+                          {/* Expandable Detail Row */}
+                          {isExpanded && (
+                            <tr key={`detail-${order.id}`} className="bg-slate-50/70">
+                              <td colSpan={7} className="px-6 py-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                  {/* Order Info */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Order Info</h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-slate-400">Manufacturer</span><span className="font-bold text-slate-600">{order.manufacturer}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Contact</span><span className="font-bold text-slate-600">{order.contactPerson || "—"}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Ordered By</span><span className="font-bold text-slate-600">{order.orderedBy}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Priority</span><span className={cn("font-bold", order.priority === "Urgent" ? "text-red-500" : "text-slate-600")}>{order.priority}</span></div>
+                                      {order.remarks && (
+                                        <div className="flex flex-col gap-1 border-t border-slate-100 pt-2"><span className="text-slate-400">Remarks</span><span className="font-medium text-slate-600 italic text-xs leading-tight">{order.remarks}</span></div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Financials & Timeline */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Financials & Timeline</h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-slate-400">Order Total</span><span className="font-black text-brand-blue text-base">₱{order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Items Count</span><span className="font-bold text-slate-600">{order.items.length} items</span></div>
+                                      <div className="flex justify-between border-t border-slate-100 pt-2"><span className="text-slate-400">Placed On</span><span className="font-bold text-slate-600">{order.placed}</span></div>
+                                      <div className="flex justify-between"><span className="text-slate-400">Expected ETA</span><span className="font-bold text-slate-600">{order.eta}</span></div>
+                                    </div>
+                                  </div>
+
+                                  {/* Items Breakdown */}
+                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Items Breakdown</h4>
+                                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                                      {order.items.map((item, idx) => (
+                                        <div key={idx} className="flex flex-col bg-slate-50 rounded-lg border border-slate-100 p-2">
+                                          <span className="font-bold text-slate-700 text-xs">{item}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       );
                     })}
                   </tbody>

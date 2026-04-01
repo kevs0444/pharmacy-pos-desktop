@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
-import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle, Clock, Truck } from "lucide-react";
+import { Package, Search, Plus, X, Save, Pill, Building2, FlaskConical, Pencil, LayoutGrid, List, ChevronLeft, ChevronRight, Trash2, AlertTriangle, Clock, Truck, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
 import type { CreateProductInput, UpdateProductInput } from "../../backend/types/api";
@@ -38,6 +38,7 @@ export function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [alertTab, setAlertTab] = useState<"restock" | "expiring" | "pending">("restock");
+  const [filterStockStatus, setFilterStockStatus] = useState<"All" | "In Stock" | "Low Stock" | "Out of Stock" | "Expiring">("All");
 
   const loadInventory = async () => {
     setIsLoading(true);
@@ -231,9 +232,12 @@ export function Inventory() {
         (item.manufacturer || "").toLowerCase().includes(q);
       const matchesCategory = selectedCategory === "All Products" || selectedCategory === "All" || item.category === selectedCategory;
       const matchesSubCategory = !selectedSubCategory || selectedSubCategory === "All" || item.subCategory === selectedSubCategory;
-      return matchesSearch && matchesCategory && matchesSubCategory;
+      const matchesStockStatus = filterStockStatus === "All" 
+        || (filterStockStatus === "Expiring" && ["expired", "critical", "warning"].includes(getExpiryStatus(item)))
+        || item.status === filterStockStatus;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesStockStatus;
     })].sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
-  }, [items, searchQuery, selectedCategory, selectedSubCategory, sortOrder]);
+  }, [items, searchQuery, selectedCategory, selectedSubCategory, sortOrder, filterStockStatus]);
 
   const pageSize = viewMode === "list" ? LIST_PAGE_SIZE : CARD_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(sortedFilteredItems.length / pageSize));
@@ -499,6 +503,46 @@ export function Inventory() {
             <Plus className="w-4 h-4 md:w-5 md:h-5" /> Add Item
           </button>
         </div>
+
+        {/* ── Inventory Summary Cards (Interactive Widgets) ── */}
+        {(() => {
+          const inStock = items.filter(i => i.status === "In Stock").length;
+          const lowStock = items.filter(i => i.status === "Low Stock").length;
+          const outOfStock = items.filter(i => i.status === "Out of Stock").length;
+          const expiring = items.filter(i => i.isActive && ["expired", "critical", "warning"].includes(getExpiryStatus(i))).length;
+          
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mt-2 mb-2">
+              {[
+                { label: "All Products", count: items.length, icon: Package,       color: "bg-slate-50 border-slate-200 text-slate-800", iconBg: "bg-slate-100 text-slate-600", ringColor: "ring-slate-300", filterVal: "All" },
+                { label: "In Stock",     count: inStock,      icon: CheckCircle,   color: "bg-emerald-50 border-emerald-200 text-emerald-800", iconBg: "bg-emerald-100 text-emerald-700", ringColor: "ring-emerald-400", filterVal: "In Stock" },
+                { label: "Low Stock",    count: lowStock,     icon: AlertTriangle, color: "bg-orange-50 border-orange-200 text-orange-800", iconBg: "bg-orange-100 text-orange-700", ringColor: "ring-orange-400", filterVal: "Low Stock" },
+                { label: "Out of Stock", count: outOfStock,   icon: XCircle,       color: "bg-red-50 border-red-200 text-red-800", iconBg: "bg-red-100 text-red-700", ringColor: "ring-red-400", filterVal: "Out of Stock" },
+                { label: "Expiring Soon",count: expiring,     icon: Clock,         color: "bg-yellow-50 border-yellow-200 text-yellow-800", iconBg: "bg-yellow-100 text-yellow-700", ringColor: "ring-yellow-400", filterVal: "Expiring" },
+              ].map(({ label, count, icon: Icon, color, iconBg, ringColor, filterVal }) => {
+                const isActive = filterStockStatus === filterVal;
+                return (
+                  <Card 
+                    key={label} 
+                    onClick={() => { setFilterStockStatus(filterVal as any); setCurrentPage(1); }}
+                    className={cn(
+                      "rounded-[1rem] shadow-sm border cursor-pointer transition-all duration-200", 
+                      color,
+                      isActive ? `ring-2 ring-offset-2 ${ringColor} scale-[1.02]` : "opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-md"
+                    )}>
+                    <CardContent className="p-4 md:p-5 flex items-center gap-3">
+                      <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", iconBg)}><Icon className="w-4 h-4" /></div>
+                      <div>
+                        <h3 className="text-xl md:text-2xl font-black">{count}</h3>
+                        <p className="text-[10px] sm:text-[9px] lg:text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         <ProductCatalogFilter
            selectedCategory={selectedCategory}
