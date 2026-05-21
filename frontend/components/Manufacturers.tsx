@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Building2, Plus, Search, Mail, Phone, MapPin, X, Save, AlertTriangle, LayoutGrid, List } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
+import { Building2, Plus, Search, Mail, Phone, MapPin, X, Save, LayoutGrid, List } from "lucide-react";
+import { Card, CardContent } from "./ui/Card";
 import { cn } from "../lib/utils";
 
 interface ManufacturerRecord {

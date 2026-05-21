@@ -7,7 +7,7 @@ import type { CreateProductInput, UpdateProductInput } from "../../backend/types
 import type { ProductBatchRecord } from "../../backend/types/domain";
 import { InventoryItem, BrandType, ProductCategory, ProductSubCategory, getExpiryStatus, getNextBatch, daysUntilExpiry, getActiveBatches, mapBatchRecordToInventoryBatch } from "../lib/inventoryModel";
 import { mapProductRecordToInventoryItem } from "../lib/mappers";
-import { ProductCard, formatStock, getCategoryIcon } from "./ProductCard";
+import { ProductCard, formatStock } from "./ProductCard";
 
 const LIST_PAGE_SIZE = 20;
 const CARD_PAGE_SIZE = 12;
@@ -38,7 +38,7 @@ export function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [dbManufacturers, setDbManufacturers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [alertTab, setAlertTab] = useState<"restock" | "expiring" | "pending">("restock");
+
   const [filterStockStatus, setFilterStockStatus] = useState<"All" | "In Stock" | "Low Stock" | "Out of Stock" | "Expiring">("All");
 
   const loadInventory = async () => {
@@ -517,15 +517,17 @@ export function Inventory() {
           const lowStock = items.filter(i => i.status === "Low Stock").length;
           const outOfStock = items.filter(i => i.status === "Out of Stock").length;
           const expiring = items.filter(i => i.isActive && ["expired", "critical", "warning"].includes(getExpiryStatus(i))).length;
+          const pendingReceipt = 0;
           
           return (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mt-2 mb-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mt-2 mb-2">
               {[
                 { label: "All Products", count: items.length, icon: Package,       color: "bg-slate-50 border-slate-200 text-slate-800", iconBg: "bg-slate-100 text-slate-600", ringColor: "ring-slate-300", filterVal: "All" },
                 { label: "In Stock",     count: inStock,      icon: CheckCircle,   color: "bg-emerald-50 border-emerald-200 text-emerald-800", iconBg: "bg-emerald-100 text-emerald-700", ringColor: "ring-emerald-400", filterVal: "In Stock" },
                 { label: "Low Stock",    count: lowStock,     icon: AlertTriangle, color: "bg-orange-50 border-orange-200 text-orange-800", iconBg: "bg-orange-100 text-orange-700", ringColor: "ring-orange-400", filterVal: "Low Stock" },
                 { label: "Out of Stock", count: outOfStock,   icon: XCircle,       color: "bg-red-50 border-red-200 text-red-800", iconBg: "bg-red-100 text-red-700", ringColor: "ring-red-400", filterVal: "Out of Stock" },
                 { label: "Expiring Soon",count: expiring,     icon: Clock,         color: "bg-yellow-50 border-yellow-200 text-yellow-800", iconBg: "bg-yellow-100 text-yellow-700", ringColor: "ring-yellow-400", filterVal: "Expiring" },
+                { label: "Pending Stock",count: pendingReceipt,icon: Truck,        color: "bg-blue-50 border-blue-200 text-blue-800", iconBg: "bg-blue-100 text-blue-700", ringColor: "ring-blue-400", filterVal: "Pending" },
               ].map(({ label, count, icon: Icon, color, iconBg, ringColor, filterVal }) => {
                 const isActive = filterStockStatus === filterVal;
                 return (
@@ -560,213 +562,6 @@ export function Inventory() {
            onToggleSort={onToggleSort}
         />
 
-        {/* Smart Inventory Alerts Widget */}
-        {(() => {
-          const needsRestock = items.filter(i => i.isActive && (i.status === "Out of Stock" || i.status === "Low Stock"));
-          const expiringSoon = items.filter(i => {
-            if (!i.isActive) return false;
-            const exp = getExpiryStatus(i);
-            return exp === "expired" || exp === "critical" || exp === "warning";
-          });
-          const pendingReceipt: InventoryItem[] = []; // Will be populated from orders API
-          
-          const hasAlerts = needsRestock.length > 0 || expiringSoon.length > 0 || pendingReceipt.length > 0;
-          
-          if (!hasAlerts) return null;
-          
-          return (
-            <Card className="border-slate-200 bg-white shadow-sm overflow-hidden mb-4">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 bg-linear-to-r from-brand-blue/5 to-brand-teal/5">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-extrabold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-orange-500" />
-                    Smart Inventory Alerts
-                  </CardTitle>
-                  <div className="flex gap-1 bg-white rounded-lg p-1 border border-slate-200">
-                    <button
-                      onClick={() => setAlertTab("restock")}
-                      className={cn(
-                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
-                        alertTab === "restock"
-                          ? "bg-orange-500 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      <Package className="w-3.5 h-3.5" />
-                      Restock
-                      {needsRestock.length > 0 && (
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
-                          alertTab === "restock" ? "bg-orange-600 text-white" : "bg-orange-100 text-orange-600"
-                        )}>
-                          {needsRestock.length}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setAlertTab("expiring")}
-                      className={cn(
-                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
-                        alertTab === "expiring"
-                          ? "bg-red-500 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      Expiring
-                      {expiringSoon.length > 0 && (
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
-                          alertTab === "expiring" ? "bg-red-600 text-white" : "bg-red-100 text-red-600"
-                        )}>
-                          {expiringSoon.length}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setAlertTab("pending")}
-                      className={cn(
-                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1.5",
-                        alertTab === "pending"
-                          ? "bg-blue-500 text-white shadow-sm"
-                          : "text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      Pending
-                      {pendingReceipt.length > 0 && (
-                        <span className={cn(
-                          "px-1.5 py-0.5 rounded-full text-[9px] font-black",
-                          alertTab === "pending" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-600"
-                        )}>
-                          {pendingReceipt.length}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 max-h-72 overflow-y-auto custom-scrollbar">
-                {/* Needs Restock Tab */}
-                {alertTab === "restock" && (
-                  <div className="divide-y divide-slate-100">
-                    {needsRestock.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">
-                        <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-bold">All products are well-stocked!</p>
-                      </div>
-                    ) : (
-                      needsRestock.map(item => {
-                        const Icon = getCategoryIcon(item.category);
-                        return (
-                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-orange-50/50 transition-colors cursor-pointer group">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="w-10 h-10 shrink-0 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform">
-                                <Icon className="w-5 h-5" />
-                              </div>
-                              <div className="overflow-hidden">
-                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{item.genericName || item.manufacturer}</p>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0 ml-3">
-                              <p className="font-black text-orange-600 text-sm tracking-tight">{item.totalStockPieces} left</p>
-                              <p className="text-[9px] font-extrabold text-orange-400 uppercase tracking-widest leading-none mt-0.5">{item.status}</p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-
-                {/* Expiring Soon Tab */}
-                {alertTab === "expiring" && (
-                  <div className="divide-y divide-slate-100">
-                    {expiringSoon.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">
-                        <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-bold">No products expiring soon!</p>
-                      </div>
-                    ) : (
-                      expiringSoon.map(item => {
-                        const Icon = getCategoryIcon(item.category);
-                        const expStatus = getExpiryStatus(item);
-                        const isExpired = expStatus === "expired";
-                        const nextBatch = getNextBatch(item);
-                        return (
-                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-red-50/50 transition-colors cursor-pointer group">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className={cn("w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center group-hover:scale-105 transition-transform", 
-                                isExpired ? "bg-red-50 border-red-200 text-red-600" : 
-                                expStatus === "critical" ? "bg-red-50 border-red-200 text-red-500" :
-                                "bg-orange-50 border-orange-200 text-orange-500"
-                              )}>
-                                <Icon className="w-5 h-5" />
-                              </div>
-                              <div className="overflow-hidden">
-                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                                  Lot: {nextBatch?.lotNumber || "N/A"} • Exp: {nextBatch?.expiryDate || "N/A"}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0 ml-3">
-                              <p className={cn("font-black text-sm tracking-tight", 
-                                isExpired || expStatus === "critical" ? "text-red-600" : "text-orange-500"
-                              )}>
-                                {isExpired ? "EXPIRED" : `${daysUntilExpiry(nextBatch?.expiryDate || "")}d left`}
-                              </p>
-                              <p className={cn("text-[9px] font-extrabold uppercase tracking-widest leading-none mt-0.5", 
-                                isExpired || expStatus === "critical" ? "text-red-400" : "text-orange-400"
-                              )}>
-                                {isExpired ? "Remove Now" : "Act Soon"}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-
-                {/* Pending Receipt Tab */}
-                {alertTab === "pending" && (
-                  <div className="divide-y divide-slate-100">
-                    {pendingReceipt.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">
-                        <Truck className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                        <p className="font-bold">No pending deliveries to receive</p>
-                        <p className="text-xs mt-1">Products from delivered orders will appear here</p>
-                      </div>
-                    ) : (
-                      pendingReceipt.map(item => {
-                        const Icon = getCategoryIcon(item.category);
-                        return (
-                          <div key={item.id} onClick={() => { setSearchQuery(item.name); setCurrentPage(1); }} className="flex items-center justify-between p-3 hover:bg-blue-50/50 transition-colors cursor-pointer group">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-500 group-hover:scale-105 transition-transform">
-                                <Icon className="w-5 h-5" />
-                              </div>
-                              <div className="overflow-hidden">
-                                <p className="font-extrabold text-slate-800 text-sm truncate">{item.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">{item.genericName || item.manufacturer}</p>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0 ml-3">
-                              <p className="font-black text-blue-600 text-xs tracking-tight uppercase">Ready</p>
-                              <p className="text-[9px] font-extrabold text-blue-400 uppercase tracking-widest leading-none mt-0.5">Receive Stock</p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })()}
 
         <Card className="border-t-4 border-t-brand-teal overflow-hidden">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-3">

@@ -21,13 +21,13 @@ This file gives agentic coding tools project-specific guidance for working in th
 
 ## AI Project Plan Summary
 - Phase 1 (Completed): High-fidelity UI for login, dashboard, inventory, orders, POS, admin, and responsive layout.
-- Phase 2 (Current Focus): Connect the UI to SQLite-backed data, complete cart math and checkout (Completed), and prepare background sync behavior.
-- Phase 3 (Next): Add role-based authorization and security boundaries across backend logic, UI visibility, and IPC permissions.
-- Phase 4: Testing offline behavior, packaging, and client delivery via `electron-builder`.
+- Phase 2 (Completed): Connect the UI to SQLite-backed data, complete cart math and checkout, refined POS terminal filtering, resolved UI alignments, and seeded varied mock product data.
+- Phase 3 (Current Focus): Add role-based authorization and security boundaries across backend logic, UI visibility, and IPC permissions.
+- Phase 4 (Next): Testing offline behavior, packaging, and client delivery via `electron-builder`.
 
 ## Roadmap Priorities For Agents
-- Phase 2 checkout and local transactions are now fully implemented and seeded with dummy Philippine medicine data.
-- The next immediate priority is completing any remaining Phase 2 tasks (such as background sync preparation or order receiving logic) or moving directly to Phase 3 (role-based authorization).
+- Phase 2 checkout, local transactions, and catalog UI refinements are fully implemented.
+- The next immediate priority is moving directly to Phase 3 (role-based authorization) or pending Phase 2 background sync preparation if requested.
 - Treat Turso or cloud sync as a later integration concern unless the current task explicitly depends on it.
 - When touching auth or admin actions, align the code with the planned Admin, Manager, and Staff role model.
 

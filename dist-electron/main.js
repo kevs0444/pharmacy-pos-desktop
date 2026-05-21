@@ -238,7 +238,27 @@ const initialSchemaMigration = {
     CREATE INDEX IF NOT EXISTS idx_users_role_status ON users (role, status);
   `
 };
-const migrations = [initialSchemaMigration];
+const fixCategoriesMigration = {
+  id: "002",
+  name: "fix_categories",
+  up: `
+    UPDATE products SET category = 'Medicine' WHERE category = 'Pharmaceutical';
+    UPDATE products SET category = 'Vitamins & Supplements' WHERE category = 'Supplements';
+    UPDATE products SET category = 'Medical Devices' WHERE category = 'Medical Device';
+    UPDATE products SET sub_category = 'OTC' WHERE sub_category = 'Over-the-Counter (OTC)';
+    UPDATE products SET sub_category = 'Prescription (Rx)' WHERE sub_category = 'Prescription';
+  `
+};
+const deleteMockProductsMigration = {
+  id: "003",
+  name: "delete_mock_products",
+  up: `
+    DELETE FROM inventory_movements WHERE product_id IN (SELECT id FROM products WHERE code LIKE 'PRD-1%');
+    DELETE FROM product_batches WHERE product_id IN (SELECT id FROM products WHERE code LIKE 'PRD-1%');
+    DELETE FROM products WHERE code LIKE 'PRD-1%';
+  `
+};
+const migrations = [initialSchemaMigration, fixCategoriesMigration, deleteMockProductsMigration];
 const KEY_LENGTH = 64;
 function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
@@ -289,56 +309,57 @@ const SEED_MANUFACTURERS = [
   { name: "GSK", contactPerson: "Ms. Reyes", email: "gsk@botikaplus.local", phone: "09179999999", category: "Pharmaceutical", address: "Taguig City" },
   { name: "Bayer", contactPerson: "Mr. Lim", email: "bayer@botikaplus.local", phone: "09170000004", category: "Pharmaceutical", address: "Makati City" }
 ];
-const SEED_PURCHASE_ORDERS = [
-  {
-    orderCode: "PO-2026-0048",
-    manufacturerName: "Unilab",
-    contactPerson: "Mr. Cruz",
-    total: 4200,
-    status: "In Transit",
-    etaDate: "2026-03-22",
-    placedDate: "2026-03-18",
-    priority: "Normal",
-    orderedByName: "Branch Manager",
-    remarks: null,
-    items: [
-      { productName: "Biogesic 500mg", quantityUnits: 10, unitLabel: "boxes", estimatedCost: 2600, remarks: null },
-      { productName: "Neozep Forte", quantityUnits: 5, unitLabel: "boxes", estimatedCost: 1600, remarks: null }
-    ]
-  },
-  {
-    orderCode: "PO-2026-0047",
-    manufacturerName: "Pfizer",
-    contactPerson: "Ms. Tan",
-    total: 8500,
-    status: "Processing",
-    etaDate: "2026-03-25",
-    placedDate: "2026-03-19",
-    priority: "Normal",
-    orderedByName: "System Administrator",
-    remarks: "Awaiting stock replenishment from supplier warehouse.",
-    items: [
-      { productName: "Amoxicillin 500mg", quantityUnits: 20, unitLabel: "boxes", estimatedCost: 8500, remarks: null }
-    ]
-  },
-  {
-    orderCode: "PO-2026-0046",
-    manufacturerName: "TGP Generics",
-    contactPerson: "Mr. Garcia",
-    total: 12400,
-    status: "In Transit",
-    etaDate: "2026-03-21",
-    placedDate: "2026-03-16",
-    priority: "Urgent",
-    orderedByName: "Branch Staff",
-    remarks: null,
-    items: [
-      { productName: "Paracetamol 500mg", quantityUnits: 50, unitLabel: "boxes", estimatedCost: 6200, remarks: null },
-      { productName: "Ibuprofen 400mg", quantityUnits: 30, unitLabel: "boxes", estimatedCost: 3800, remarks: null },
-      { productName: "Mefenamic Acid", quantityUnits: 20, unitLabel: "boxes", estimatedCost: 2400, remarks: null }
-    ]
+function generateMockPurchaseOrders() {
+  const orders = [];
+  const statuses = ["Processing", "In Transit", "Delivered", "Cancelled"];
+  const priorities = ["Normal", "Urgent"];
+  const manufacturers = [
+    { name: "Unilab", contact: "Mr. Cruz" },
+    { name: "Pfizer", contact: "Ms. Tan" },
+    { name: "TGP Generics", contact: "Mr. Garcia" },
+    { name: "PharmaTech", contact: "Mr. Cruz" },
+    { name: "Vitamins Plus", contact: "Ms. Bautista" },
+    { name: "Bayer", contact: "Mr. Lim" }
+  ];
+  const users = ["System Administrator", "Branch Manager", "Branch Staff"];
+  for (let i = 1; i <= 120; i++) {
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    const mfg = manufacturers[Math.floor(Math.random() * manufacturers.length)];
+    const user = users[Math.floor(Math.random() * users.length)];
+    const itemsCount = Math.floor(Math.random() * 5) + 1;
+    const items = [];
+    let total = 0;
+    for (let j = 0; j < itemsCount; j++) {
+      const quantityUnits = Math.floor(Math.random() * 50) + 10;
+      const estimatedCost = quantityUnits * (Math.floor(Math.random() * 500) + 50);
+      total += estimatedCost;
+      items.push({
+        productName: `Mock Item ${i}-${j}`,
+        quantityUnits,
+        unitLabel: "boxes",
+        estimatedCost,
+        remarks: null
+      });
+    }
+    const padI = String(i).padStart(4, "0");
+    orders.push({
+      orderCode: `PO-2026-MOCK${padI}`,
+      manufacturerName: mfg.name,
+      contactPerson: mfg.contact,
+      total,
+      status,
+      etaDate: `2026-03-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`,
+      placedDate: `2026-02-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`,
+      priority,
+      orderedByName: user,
+      remarks: null,
+      items
+    });
   }
-];
+  return orders;
+}
+const SEED_PURCHASE_ORDERS = generateMockPurchaseOrders();
 const SEED_RECEIPT_SETTINGS = {
   storeName: "BOTIKAPLUS",
   address: "123 Health Ave, Makati City",
@@ -412,8 +433,8 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Paracetamol",
     manufacturerName: "Unilab",
     brandType: "Branded",
-    category: "Pharmaceutical",
-    subCategory: "Over-the-Counter (OTC)",
+    category: "Medicine",
+    subCategory: "OTC",
     packagingUnit: "Box",
     baseUnit: "Tablet",
     piecesPerUnit: 100,
@@ -429,8 +450,8 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Phenylephrine HCl + Chlorphenamine Maleate + Paracetamol",
     manufacturerName: "Unilab",
     brandType: "Branded",
-    category: "Pharmaceutical",
-    subCategory: "Over-the-Counter (OTC)",
+    category: "Medicine",
+    subCategory: "OTC",
     packagingUnit: "Box",
     baseUnit: "Tablet",
     piecesPerUnit: 100,
@@ -446,7 +467,7 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Amoxicillin Trihydrate",
     manufacturerName: "Generic Pharma",
     brandType: "Generic",
-    category: "Pharmaceutical",
+    category: "Medicine",
     subCategory: "Prescription (Rx)",
     packagingUnit: "Box",
     baseUnit: "Capsule",
@@ -463,8 +484,8 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Ibuprofen + Paracetamol",
     manufacturerName: "Unilab",
     brandType: "Branded",
-    category: "Pharmaceutical",
-    subCategory: "Over-the-Counter (OTC)",
+    category: "Medicine",
+    subCategory: "OTC",
     packagingUnit: "Box",
     baseUnit: "Capsule",
     piecesPerUnit: 100,
@@ -480,7 +501,7 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Losartan",
     manufacturerName: "TGP Generics",
     brandType: "Generic",
-    category: "Pharmaceutical",
+    category: "Medicine",
     subCategory: "Prescription (Rx)",
     packagingUnit: "Box",
     baseUnit: "Tablet",
@@ -497,8 +518,8 @@ const SEED_PHARMA_PRODUCTS = [
     genericName: "Loperamide",
     manufacturerName: "Unilab",
     brandType: "Branded",
-    category: "Pharmaceutical",
-    subCategory: "Over-the-Counter (OTC)",
+    category: "Medicine",
+    subCategory: "OTC",
     packagingUnit: "Box",
     baseUnit: "Capsule",
     piecesPerUnit: 100,
@@ -509,6 +530,150 @@ const SEED_PHARMA_PRODUCTS = [
     salesCount: 60
   }
 ];
+function generateMockProducts() {
+  const products = [...SEED_PHARMA_PRODUCTS];
+  let codeCounter = 1e3;
+  const nextCode = () => `PRD-${String(codeCounter++).padStart(4, "0")}`;
+  const manufacturers = ["Unilab", "Pfizer", "Generic Pharma", "TGP Generics", "GSK", "Bayer", "PharmaTech", "Vitamins Plus", "AllergyCare", "Respiratory Care"];
+  const medPrefixes = ["Amoxi", "Para", "Ibu", "Cef", "Losar", "Amlodi", "Metfor", "Clinda", "Azithro", "Cetiri", "Loxa", "Ome", "Panto", "Lans", "Rosi"];
+  const medSuffixes = ["cillin", "cetamol", "profen", "alexin", "tan", "pine", "min", "mycin", "zine", "prazole", "statin", "olol"];
+  for (let i = 0; i < 500; i++) {
+    const pre = medPrefixes[i % medPrefixes.length];
+    const suf = medSuffixes[i * 3 % medSuffixes.length];
+    const mg = [100, 250, 500, 1e3][i % 4];
+    const unitPrice = 50 + i % 50 * 10;
+    products.push({
+      code: nextCode(),
+      name: `${pre}${suf} ${mg}mg`,
+      genericName: `${pre}${suf}`,
+      manufacturerName: manufacturers[i % manufacturers.length],
+      brandType: i % 3 === 0 ? "Generic" : "Branded",
+      category: "Medicine",
+      subCategory: i % 2 === 0 ? "Prescription (Rx)" : "OTC",
+      packagingUnit: "Box",
+      baseUnit: "Tablet",
+      piecesPerUnit: 100,
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.5,
+      sellingPricePerPiece: unitPrice * 1.5 / 100,
+      discount: i % 10 === 0 ? 10 : 0,
+      salesCount: Math.floor(Math.random() * 500)
+    });
+  }
+  const vits = ["Vitamin C", "Vitamin B Complex", "Multivitamins", "Zinc", "Calcium", "Iron", "Fish Oil", "Vitamin D3", "Magnesium", "Folic Acid"];
+  for (let i = 0; i < 100; i++) {
+    const vit = vits[i % vits.length];
+    const unitPrice = 100 + i % 20 * 10;
+    products.push({
+      code: nextCode(),
+      name: `${vit} ${[500, 1e3, 100][i % 3]}mg`,
+      genericName: vit,
+      manufacturerName: manufacturers[(i + 2) % manufacturers.length],
+      brandType: i % 4 === 0 ? "Generic" : "Branded",
+      category: "Vitamins & Supplements",
+      subCategory: "OTC",
+      packagingUnit: "Bottle",
+      baseUnit: "Capsule",
+      piecesPerUnit: 30,
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.6,
+      sellingPricePerPiece: unitPrice * 1.6 / 30,
+      discount: 0,
+      salesCount: Math.floor(Math.random() * 300)
+    });
+  }
+  const devices = ["Blood Pressure Monitor", "Glucometer", "Thermometer", "Pulse Oximeter", "Nebulizer", "Stethoscope", "Weighing Scale"];
+  for (let i = 0; i < 50; i++) {
+    const dev = devices[i % devices.length];
+    const unitPrice = 500 + i % 10 * 200;
+    products.push({
+      code: nextCode(),
+      name: `${dev} Model-${i + 1}`,
+      genericName: dev,
+      manufacturerName: manufacturers[(i + 3) % manufacturers.length],
+      brandType: "Branded",
+      category: "Medical Devices",
+      subCategory: "None",
+      packagingUnit: "Box",
+      baseUnit: "Unit",
+      piecesPerUnit: 1,
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.3,
+      sellingPricePerPiece: unitPrice * 1.3,
+      discount: i % 5 === 0 ? 5 : 0,
+      salesCount: Math.floor(Math.random() * 50)
+    });
+  }
+  const supplies = ["Syringe 3ml", "Surgical Mask", "Gauze Pad", "Alcohol Swab", "Band-Aid", "Cotton Roll", "Micropore Tape", "Gloves (Medium)"];
+  for (let i = 0; i < 100; i++) {
+    const sup = supplies[i % supplies.length];
+    const unitPrice = 20 + i % 10 * 5;
+    products.push({
+      code: nextCode(),
+      name: `${sup} x${[10, 50, 100][i % 3]}`,
+      genericName: sup,
+      manufacturerName: manufacturers[(i + 4) % manufacturers.length],
+      brandType: "Others",
+      category: "Medical Supplies",
+      subCategory: "None",
+      packagingUnit: "Pack",
+      baseUnit: "Piece",
+      piecesPerUnit: [10, 50, 100][i % 3],
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.4,
+      sellingPricePerPiece: unitPrice * 1.4 / [10, 50, 100][i % 3],
+      discount: 0,
+      salesCount: Math.floor(Math.random() * 400)
+    });
+  }
+  const pc = ["Shampoo", "Soap", "Toothpaste", "Deodorant", "Body Wash", "Mouthwash", "Lotion", "Sunblock"];
+  for (let i = 0; i < 100; i++) {
+    const p = pc[i % pc.length];
+    const sub = ["Skincare", "Haircare", "Dental"][i % 3];
+    const unitPrice = 80 + i % 15 * 10;
+    products.push({
+      code: nextCode(),
+      name: `${p} ${[100, 250, 500][i % 3]}ml`,
+      genericName: p,
+      manufacturerName: manufacturers[(i + 5) % manufacturers.length],
+      brandType: "Branded",
+      category: "Personal Care",
+      subCategory: sub,
+      packagingUnit: "Bottle",
+      baseUnit: "Unit",
+      piecesPerUnit: 1,
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.5,
+      sellingPricePerPiece: unitPrice * 1.5,
+      discount: i % 8 === 0 ? 15 : 0,
+      salesCount: Math.floor(Math.random() * 250)
+    });
+  }
+  const bm = ["Diapers (M)", "Diapers (L)", "Baby Wipes", "Baby Powder", "Baby Oil", "Maternity Pads", "Breast Pump", "Baby Wash"];
+  for (let i = 0; i < 50; i++) {
+    const b = bm[i % bm.length];
+    const unitPrice = 150 + i % 10 * 30;
+    products.push({
+      code: nextCode(),
+      name: `${b} ${[30, 50, 100][i % 3]}s`,
+      genericName: b,
+      manufacturerName: manufacturers[(i + 1) % manufacturers.length],
+      brandType: "Branded",
+      category: "Baby & Mom",
+      subCategory: "None",
+      packagingUnit: "Pack",
+      baseUnit: "Piece",
+      piecesPerUnit: [30, 50, 100][i % 3],
+      unitPriceCost: unitPrice,
+      sellingPricePerUnit: unitPrice * 1.4,
+      sellingPricePerPiece: unitPrice * 1.4 / [30, 50, 100][i % 3],
+      discount: 0,
+      salesCount: Math.floor(Math.random() * 150)
+    });
+  }
+  return products;
+}
+const ALL_SEED_PRODUCTS = generateMockProducts();
 function seedProducts(db) {
   const existingProducts = db.prepare("SELECT code FROM products").all();
   const existingCodes = new Set(existingProducts.map((p) => p.code));
@@ -526,7 +691,7 @@ function seedProducts(db) {
     ) VALUES (
       @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
       @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
-      @sellingPricePerUnit, @sellingPricePerPiece, @discount, @salesCount, 'In Stock',
+      @sellingPricePerUnit, @sellingPricePerPiece, @discount, @salesCount, @status,
       @createdAt, @updatedAt
     )
   `);
@@ -546,15 +711,29 @@ function seedProducts(db) {
       @productId, @productBatchId, 'OPENING_BALANCE', @quantityPieces, 'Initial seed data', @createdAt
     )
   `);
-  for (let i = 0; i < SEED_PHARMA_PRODUCTS.length; i++) {
-    const p = SEED_PHARMA_PRODUCTS[i];
+  for (let i = 0; i < ALL_SEED_PRODUCTS.length; i++) {
+    const p = ALL_SEED_PRODUCTS[i];
     if (existingCodes.has(p.code)) continue;
     const timestamp = nowIso();
-    const initialStockPieces = p.piecesPerUnit * 2;
+    let initialStockPieces = p.piecesPerUnit * 2;
+    let expiryDate = "2027-01-10";
+    let status = "In Stock";
+    if (i % 25 === 0) {
+      initialStockPieces = 0;
+      status = "Out of Stock";
+    } else if (i % 15 === 0) {
+      initialStockPieces = Math.min(5, p.piecesPerUnit);
+      status = "Low Stock";
+    } else if (i % 18 === 0) {
+      const date = /* @__PURE__ */ new Date();
+      date.setDate(date.getDate() + 30);
+      expiryDate = date.toISOString().split("T")[0];
+    }
     const result = insertProduct.run({
       ...p,
       manufacturerId: manufacturerLookup.get(p.manufacturerName) ?? null,
       totalStockPieces: initialStockPieces,
+      status,
       createdAt: timestamp,
       updatedAt: timestamp
     });
@@ -564,8 +743,7 @@ function seedProducts(db) {
       batchCode: `BATCH-${p.code}-001`,
       lotNumber: `LOT${Math.floor(Math.random() * 9e4) + 1e4}`,
       manufacturingDate: "2025-01-10",
-      expiryDate: "2027-01-10",
-      // ensure it's unexpired
+      expiryDate,
       stockPieces: initialStockPieces,
       receivedDate: timestamp,
       createdAt: timestamp,

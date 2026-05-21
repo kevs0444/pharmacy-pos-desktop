@@ -156,7 +156,7 @@ export function POS() {
     const isActive = p.isActive !== false; // Disabled products hidden from POS
     const hasSellable = getSellableBatches(p).length > 0; // Hide completely if OOS or expired
     return matchesSearch && matchesCategory && matchesSubCategory && isActive && hasSellable;
-  }), [searchQuery, selectedCategory, selectedSubCategory]);
+  }), [inventoryProducts, searchQuery, selectedCategory, selectedSubCategory]);
 
   const sortedFilteredProducts = useMemo(() =>
     [...filteredProducts].sort((a, b) => sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)),
@@ -173,11 +173,14 @@ export function POS() {
     if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
     return [1, '...', current - 1, current, current + 1, '...', total];
   };
-
-  const topSellingProducts = [...inventoryProducts]
-    .filter(p => p.isActive !== false && getSellableBatches(p).length > 0)
-    .sort((a, b) => b.salesCount - a.salesCount)
-    .slice(0, 4);
+  const topSellingProducts = useMemo(() => {
+    return [...inventoryProducts]
+      .filter(p => p.isActive !== false && getSellableBatches(p).length > 0)
+      .filter(p => selectedCategory === "All" || selectedCategory === "All Products" || p.category === selectedCategory)
+      .filter(p => !selectedSubCategory || selectedSubCategory === "All" || p.subCategory === selectedSubCategory)
+      .sort((a, b) => b.salesCount - a.salesCount)
+      .slice(0, 4);
+  }, [inventoryProducts, selectedCategory, selectedSubCategory]);
 
   const subtotal = cart.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0);
   const total = subtotal;
@@ -602,7 +605,7 @@ export function POS() {
         <div className="flex-1 overflow-y-auto pr-2 pb-4 custom-scrollbar flex flex-col gap-6">
           
           {/* Top Selling Section */}
-          {searchQuery === "" && selectedCategory === "All" && selectedSubCategory === "All" && (
+          {searchQuery === "" && topSellingProducts.length > 0 && (
             <div>
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                 🔥 Top Selling
