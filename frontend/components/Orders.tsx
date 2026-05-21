@@ -25,7 +25,7 @@ interface PurchaseOrder {
 }
 
 const MOCK_STAFF = ["Admin", "Jane Reyes", "Mark Santos", "Liza Cruz", "Ben Alvarez"];
-const MOCK_MANUFACTURERS = ["Unilab", "Pfizer", "TGP Generics", "GSK", "Bayer", "Unilever", "PharmaTech", "MedCorp"];
+
 
 const PAGE_SIZE = 6;
 
@@ -50,6 +50,7 @@ const emptyForm = () => ({
 
 export function Orders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [dbManufacturers, setDbManufacturers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -59,6 +60,8 @@ export function Orders() {
         const result = await window.api.orders.list({ page: 1, pageSize: 500 });
         const mappedOrders: PurchaseOrder[] = result.items.map(mapPurchaseOrderRecordToPurchaseOrder);
         setOrders(mappedOrders);
+        const mfgResult = await window.api.admin.listManufacturers();
+        setDbManufacturers(mfgResult.map((m: any) => m.name));
       } catch (e: any) {
         window.dispatchEvent(new CustomEvent('app-error', {
           detail: { title: "Orders Fetch Error", message: e.message || String(e) }
@@ -124,6 +127,13 @@ export function Orders() {
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
   const pagedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+  const getPageNumbers = (current: number, total: number) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, '...', total];
+    if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  };
+
   const uniqueManufacturers = [...new Set(orders.map(o => o.manufacturer))];
   const uniqueStaff = [...new Set(orders.map(o => o.orderedBy))];
 
@@ -151,7 +161,7 @@ export function Orders() {
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacturer / Supplier *</label>
                   <select value={form.manufacturer} onChange={e => setForm({...form, manufacturer: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all">
                     <option value="">Select manufacturer...</option>
-                    {MOCK_MANUFACTURERS.map(m => <option key={m} value={m}>{m}</option>)}
+                    {dbManufacturers.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -506,13 +516,17 @@ export function Orders() {
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
                     <ChevronLeft className="w-4 h-4 text-slate-600" />
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button key={page} onClick={() => setCurrentPage(page)}
-                      className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
-                        currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
-                      )}>
-                      {page}
-                    </button>
+                  {getPageNumbers(currentPage, totalPages).map((page, i) => (
+                    page === '...' ? (
+                       <span key={`dots-${i}`} className="px-2 py-1 text-slate-400 font-bold">...</span>
+                    ) : (
+                       <button key={`page-${page}`} onClick={() => setCurrentPage(page as number)}
+                         className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
+                           currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
+                         )}>
+                         {page}
+                       </button>
+                    )
                   ))}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">

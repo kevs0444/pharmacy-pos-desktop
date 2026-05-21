@@ -167,6 +167,13 @@ export function POS() {
   const totalPages = Math.max(1, Math.ceil(sortedFilteredProducts.length / pageSize));
   const pagedProducts = sortedFilteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const getPageNumbers = (current: number, total: number) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, '...', total];
+    if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+  };
+
   const topSellingProducts = [...inventoryProducts]
     .filter(p => p.isActive !== false && getSellableBatches(p).length > 0)
     .sort((a, b) => b.salesCount - a.salesCount)
@@ -206,15 +213,82 @@ export function POS() {
     setCashTenderedStr(prev => prev + val);
   };
 
-  const handleCompleteSale = () => {
-    setIsPaymentSuccess(true);
-    setTimeout(() => {
-      setIsPaymentSuccess(false);
-      setIsCheckoutOpen(false);
-      setCart([]);
-      setCashTenderedStr("");
-      setDiscountType("None");
-    }, 2200);
+  const handleCompleteSale = async () => {
+    try {
+      const payload = {
+        cashierUserId: 1, // Hardcoded for now
+        customerName: (discountType === 'Senior' || discountType === 'PWD') && discountInfo ? discountInfo.fullName : undefined,
+        subtotal: subtotal,
+        discountType: discountType,
+        discountValue: discountType === 'Custom' ? customDiscountPercent : (discountType === 'Senior' || discountType === 'PWD' ? 20 : undefined),
+        discountAmount: discountAmount,
+        total: finalTotal,
+        cashTendered: cashTendered,
+        changeAmount: change,
+        paymentMethod: 'Cash' as const,
+        requiresPrescription: needsPrescription,
+        doctorName: doctorInfo?.doctorName,
+        doctorLicense: doctorInfo?.licenseNumber,
+        items: cart.map(item => ({
+          productId: item.product.id,
+          productBatchId: Number(item.batchId),
+          productName: item.product.name,
+          lotNumber: item.lotNumber,
+          expiryDate: item.expiryDate,
+          quantity: item.qty,
+          sellByPiece: item.sellByPiece,
+          unitLabel: item.sellByPiece ? item.product.baseUnit : item.product.packagingUnit,
+          unitPrice: item.sellByPiece ? item.product.sellingPricePerPiece : item.product.sellingPricePerUnit,
+          discountAmount: 0,
+          lineTotal: getItemPrice(item) * item.qty
+        }))
+      }
+
+      await window.api.pos.checkout(payload)
+
+      setIsPaymentSuccess(true);
+      setTimeout(async () => {
+        setIsPaymentSuccess(false);
+        setIsCheckoutOpen(false);
+        setCart([]);
+        setCashTenderedStr("");
+        setDiscountType("None");
+        setDiscountInfo(null);
+        setDoctorInfo(null);
+
+        // Refresh catalog
+        try {
+          const pageSize = 100;
+          let page = 1;
+          let totalPages = 1;
+          const allProducts = [];
+
+          do {
+            const result = await window.api.pos.listCatalog({ page, pageSize, includeInactive: false, onlySellable: true });
+            allProducts.push(...result.items);
+            totalPages = result.totalPages;
+            page += 1;
+          } while (page <= totalPages);
+
+          const mappedItems: InventoryItem[] = await Promise.all(
+            allProducts.map(async (product) => {
+              const batches = await window.api.inventory.listBatches(product.id);
+              return {
+                ...mapProductRecordToInventoryItem(product),
+                batches: batches.map((batch: ProductBatchRecord) => mapBatchRecordToInventoryBatch(batch)),
+              };
+            }),
+          );
+          setInventoryProducts(mappedItems);
+        } catch (e) {
+          console.error("Failed to reload catalog:", e);
+        }
+      }, 2200);
+    } catch (error: any) {
+      window.dispatchEvent(new CustomEvent('app-error', {
+        detail: { title: "Checkout Failed", message: error.message || String(error) }
+      }));
+    }
   };
 
   return (
@@ -480,15 +554,17 @@ export function POS() {
       )}
 
       {/* Main POS Interface */}
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden bg-slate-50 relative z-0">
-        <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+      <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto flex flex-col bg-slate-50 relative custom-scrollbar">
+        <div className="flex items-center gap-4 mb-6">
           <div>
-            <h1 className="text-xl md:text-2xl font-extrabold text-slate-800 flex items-center gap-3">
-              Sales Counter
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
+              Product Showcase
               {isLoading && <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md animate-pulse">Loading...</span>}
             </h1>
-            <p className="text-sm text-slate-500 font-medium">Point of Sale — select items to add to current transaction.</p>
+            <p className="text-sm font-medium text-slate-500 mt-1">Select products to add to current transaction.</p>
           </div>
+        </div>
+        <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1 md:w-72">
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -623,13 +699,17 @@ export function POS() {
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
                     <ChevronLeft className="w-4 h-4 text-slate-600" />
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button key={page} onClick={() => setCurrentPage(page)}
-                      className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
-                        currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
-                      )}>
-                      {page}
-                    </button>
+                  {getPageNumbers(currentPage, totalPages).map((page, i) => (
+                    page === '...' ? (
+                       <span key={`dots-${i}`} className="px-2 py-1 text-slate-400 font-bold">...</span>
+                    ) : (
+                       <button key={`page-${page}`} onClick={() => setCurrentPage(page as number)}
+                         className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
+                           currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
+                         )}>
+                         {page}
+                       </button>
+                    )
                   ))}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
@@ -695,7 +775,23 @@ export function POS() {
                       <span className="text-xs font-bold text-brand-green">₱{(getItemPrice(item) * item.qty).toFixed(2)}</span>
                       <div className="flex items-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
                         <button onClick={() => updateQty(item.product.id, item.sellByPiece, -1)} className="p-1 hover:bg-white rounded transition-colors"><Minus className="w-3 h-3 text-slate-500" /></button>
-                        <span className="w-8 text-xs font-bold text-center text-slate-700">{item.qty}</span>
+                        <input 
+                          type="number"
+                          min="1"
+                          className="w-10 text-xs font-bold text-center text-slate-700 bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-brand-blue/30 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              updateQty(item.product.id, item.sellByPiece, 1 - item.qty);
+                            } else {
+                              const num = parseInt(val, 10);
+                              if (!isNaN(num) && num > 0) {
+                                updateQty(item.product.id, item.sellByPiece, num - item.qty);
+                              }
+                            }
+                          }}
+                        />
                         <button onClick={() => updateQty(item.product.id, item.sellByPiece, 1)} className="p-1 hover:bg-white rounded transition-colors"><Plus className="w-3 h-3 text-slate-500" /></button>
                       </div>
                     </div>

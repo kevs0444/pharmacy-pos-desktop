@@ -69,7 +69,7 @@ export function ProductCatalogFilter({
   return (
     <div className="flex flex-col gap-3 mb-6 bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100">
       {/* Top Row: Main Groups + Sort */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 w-full">
         <div className="flex gap-2 overflow-x-auto pb-1 flex-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {categoryGroups.map(g => (
              <button 

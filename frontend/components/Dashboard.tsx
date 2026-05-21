@@ -136,8 +136,18 @@ export function Dashboard({ userRole }: DashboardProps) {
                 <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-100 bg-slate-50/50">
                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
                       <div>
-                         <CardTitle className="text-lg font-extrabold text-slate-800">My Hourly Sales Trend</CardTitle>
-                         <p className="text-xs font-medium text-slate-500 mt-1">Transactional volume per hour.</p>
+                         <CardTitle className="text-lg font-extrabold text-slate-800">
+                           {staffBarTF === 'Daily' ? 'My Hourly Sales Trend' : 
+                            staffBarTF === 'Weekly' ? 'My Daily Sales Trend' : 
+                            staffBarTF === 'Monthly' ? 'My Weekly Sales Trend' : 
+                            'My Monthly Sales Trend'}
+                         </CardTitle>
+                         <p className="text-xs font-medium text-slate-500 mt-1">
+                           {staffBarTF === 'Daily' ? 'Transactional volume per hour.' : 
+                            staffBarTF === 'Weekly' ? 'Transactional volume per day.' : 
+                            staffBarTF === 'Monthly' ? 'Transactional volume per week.' : 
+                            'Transactional volume per month.'}
+                         </p>
                       </div>
                       <TimeframeSelector defaultValue="Daily" onChange={(tf) => setStaffBarTF(tf)} />
                    </div>

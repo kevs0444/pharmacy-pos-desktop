@@ -365,10 +365,8 @@ function seedDatabase(db) {
   seed();
 }
 function seedUsers(db) {
-  const count = db.prepare("SELECT COUNT(*) AS count FROM users").get();
-  if (count.count > 0) {
-    return;
-  }
+  const existingUsers = db.prepare("SELECT username FROM users").all();
+  const existingUsernames = new Set(existingUsers.map((u) => u.username));
   const insert = db.prepare(`
     INSERT INTO users (
       username, full_name, email, password_hash, role, status, phone, address, created_at, updated_at
@@ -377,6 +375,7 @@ function seedUsers(db) {
     )
   `);
   for (const user of SEED_USERS) {
+    if (existingUsernames.has(user.username)) continue;
     const timestamp = nowIso();
     insert.run({
       ...user,
@@ -387,10 +386,8 @@ function seedUsers(db) {
   }
 }
 function seedManufacturers(db) {
-  const count = db.prepare("SELECT COUNT(*) AS count FROM manufacturers").get();
-  if (count.count > 0) {
-    return;
-  }
+  const existingMfrs = db.prepare("SELECT name FROM manufacturers").all();
+  const existingNames = new Set(existingMfrs.map((m) => m.name));
   const insert = db.prepare(`
     INSERT INTO manufacturers (
       name, contact_person, email, phone, category, address, is_active, created_at, updated_at
@@ -399,6 +396,7 @@ function seedManufacturers(db) {
     )
   `);
   for (const manufacturer of SEED_MANUFACTURERS) {
+    if (existingNames.has(manufacturer.name)) continue;
     const timestamp = nowIso();
     insert.run({
       ...manufacturer,
@@ -407,10 +405,230 @@ function seedManufacturers(db) {
     });
   }
 }
+const SEED_PHARMA_PRODUCTS = [
+  {
+    code: "PRD-0001",
+    name: "Biogesic 500mg",
+    genericName: "Paracetamol",
+    manufacturerName: "Unilab",
+    brandType: "Branded",
+    category: "Pharmaceutical",
+    subCategory: "Over-the-Counter (OTC)",
+    packagingUnit: "Box",
+    baseUnit: "Tablet",
+    piecesPerUnit: 100,
+    unitPriceCost: 400,
+    sellingPricePerUnit: 500,
+    sellingPricePerPiece: 5.5,
+    discount: 0,
+    salesCount: 150
+  },
+  {
+    code: "PRD-0002",
+    name: "Neozep Forte",
+    genericName: "Phenylephrine HCl + Chlorphenamine Maleate + Paracetamol",
+    manufacturerName: "Unilab",
+    brandType: "Branded",
+    category: "Pharmaceutical",
+    subCategory: "Over-the-Counter (OTC)",
+    packagingUnit: "Box",
+    baseUnit: "Tablet",
+    piecesPerUnit: 100,
+    unitPriceCost: 500,
+    sellingPricePerUnit: 650,
+    sellingPricePerPiece: 7,
+    discount: 0,
+    salesCount: 120
+  },
+  {
+    code: "PRD-0003",
+    name: "Amoxicillin 500mg",
+    genericName: "Amoxicillin Trihydrate",
+    manufacturerName: "Generic Pharma",
+    brandType: "Generic",
+    category: "Pharmaceutical",
+    subCategory: "Prescription (Rx)",
+    packagingUnit: "Box",
+    baseUnit: "Capsule",
+    piecesPerUnit: 100,
+    unitPriceCost: 200,
+    sellingPricePerUnit: 350,
+    sellingPricePerPiece: 4,
+    discount: 0,
+    salesCount: 85
+  },
+  {
+    code: "PRD-0004",
+    name: "Alaxan FR",
+    genericName: "Ibuprofen + Paracetamol",
+    manufacturerName: "Unilab",
+    brandType: "Branded",
+    category: "Pharmaceutical",
+    subCategory: "Over-the-Counter (OTC)",
+    packagingUnit: "Box",
+    baseUnit: "Capsule",
+    piecesPerUnit: 100,
+    unitPriceCost: 650,
+    sellingPricePerUnit: 800,
+    sellingPricePerPiece: 8.5,
+    discount: 5,
+    salesCount: 210
+  },
+  {
+    code: "PRD-0005",
+    name: "Losartan Potassium 50mg",
+    genericName: "Losartan",
+    manufacturerName: "TGP Generics",
+    brandType: "Generic",
+    category: "Pharmaceutical",
+    subCategory: "Prescription (Rx)",
+    packagingUnit: "Box",
+    baseUnit: "Tablet",
+    piecesPerUnit: 100,
+    unitPriceCost: 300,
+    sellingPricePerUnit: 450,
+    sellingPricePerPiece: 5,
+    discount: 0,
+    salesCount: 300
+  },
+  {
+    code: "PRD-0006",
+    name: "Diatabs 2mg",
+    genericName: "Loperamide",
+    manufacturerName: "Unilab",
+    brandType: "Branded",
+    category: "Pharmaceutical",
+    subCategory: "Over-the-Counter (OTC)",
+    packagingUnit: "Box",
+    baseUnit: "Capsule",
+    piecesPerUnit: 100,
+    unitPriceCost: 500,
+    sellingPricePerUnit: 650,
+    sellingPricePerPiece: 7.5,
+    discount: 0,
+    salesCount: 60
+  }
+];
 function seedProducts(db) {
-  const count = db.prepare("SELECT COUNT(*) AS count FROM products").get();
-  if (count.count > 0) {
-    return;
+  const existingProducts = db.prepare("SELECT code FROM products").all();
+  const existingCodes = new Set(existingProducts.map((p) => p.code));
+  const manufacturerLookup = /* @__PURE__ */ new Map();
+  const manufacturers = db.prepare("SELECT id, name FROM manufacturers").all();
+  for (const manufacturer of manufacturers) {
+    manufacturerLookup.set(manufacturer.name, manufacturer.id);
+  }
+  const insertProduct = db.prepare(`
+    INSERT INTO products (
+      code, name, generic_name, manufacturer_id, brand_type, category, sub_category,
+      packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
+      selling_price_per_unit, selling_price_per_piece, discount, sales_count, status,
+      created_at, updated_at
+    ) VALUES (
+      @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
+      @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
+      @sellingPricePerUnit, @sellingPricePerPiece, @discount, @salesCount, 'In Stock',
+      @createdAt, @updatedAt
+    )
+  `);
+  const insertBatch = db.prepare(`
+    INSERT INTO product_batches (
+      product_id, batch_code, lot_number, manufacturing_date, expiry_date,
+      stock_pieces, received_date, created_at, updated_at
+    ) VALUES (
+      @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
+      @stockPieces, @receivedDate, @createdAt, @updatedAt
+    )
+  `);
+  const insertMovement = db.prepare(`
+    INSERT INTO inventory_movements (
+      product_id, product_batch_id, movement_type, quantity_pieces, reason, created_at
+    ) VALUES (
+      @productId, @productBatchId, 'OPENING_BALANCE', @quantityPieces, 'Initial seed data', @createdAt
+    )
+  `);
+  for (let i = 0; i < SEED_PHARMA_PRODUCTS.length; i++) {
+    const p = SEED_PHARMA_PRODUCTS[i];
+    if (existingCodes.has(p.code)) continue;
+    const timestamp = nowIso();
+    const initialStockPieces = p.piecesPerUnit * 2;
+    const result = insertProduct.run({
+      ...p,
+      manufacturerId: manufacturerLookup.get(p.manufacturerName) ?? null,
+      totalStockPieces: initialStockPieces,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+    const productId = Number(result.lastInsertRowid);
+    const batchResult = insertBatch.run({
+      productId,
+      batchCode: `BATCH-${p.code}-001`,
+      lotNumber: `LOT${Math.floor(Math.random() * 9e4) + 1e4}`,
+      manufacturingDate: "2025-01-10",
+      expiryDate: "2027-01-10",
+      // ensure it's unexpired
+      stockPieces: initialStockPieces,
+      receivedDate: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    });
+    const productBatchId = Number(batchResult.lastInsertRowid);
+    insertMovement.run({
+      productId,
+      productBatchId,
+      quantityPieces: initialStockPieces,
+      createdAt: timestamp
+    });
+  }
+  const generateCount = 1e3;
+  if (existingCodes.size < generateCount) {
+    const manufacturerIds = Array.from(manufacturerLookup.values());
+    const manufacturerId = manufacturerIds.length > 0 ? manufacturerIds[0] : null;
+    for (let i = 1; i <= generateCount; i++) {
+      const code = `DUMMY-${i.toString().padStart(4, "0")}`;
+      if (existingCodes.has(code)) continue;
+      const timestamp = nowIso();
+      const basePrice = Math.floor(Math.random() * 500) + 50;
+      const ppu = 100;
+      const initialStockPieces = ppu * 5;
+      const result = insertProduct.run({
+        code,
+        name: `Test Medicine ${i}`,
+        genericName: `Generic Form ${i}`,
+        manufacturerId,
+        brandType: "Generic",
+        category: "Pharmaceutical",
+        subCategory: "Over-the-Counter (OTC)",
+        packagingUnit: "Box",
+        baseUnit: "Tablet",
+        piecesPerUnit: ppu,
+        totalStockPieces: initialStockPieces,
+        unitPriceCost: basePrice * 0.8,
+        sellingPricePerUnit: basePrice,
+        sellingPricePerPiece: basePrice / ppu * 1.5,
+        discount: 0,
+        salesCount: Math.floor(Math.random() * 100),
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      const productId = Number(result.lastInsertRowid);
+      const batchResult = insertBatch.run({
+        productId,
+        batchCode: `BATCH-${code}-001`,
+        lotNumber: `LOT${Math.floor(Math.random() * 9e4) + 1e4}`,
+        manufacturingDate: "2025-01-10",
+        expiryDate: "2027-01-10",
+        stockPieces: initialStockPieces,
+        receivedDate: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      });
+      insertMovement.run({
+        productId,
+        productBatchId: Number(batchResult.lastInsertRowid),
+        quantityPieces: initialStockPieces,
+        createdAt: timestamp
+      });
+    }
   }
 }
 function seedReceiptSettings(db) {
@@ -446,10 +664,8 @@ function seedAppSettings(db) {
   insert.run({ settingKey: "backup.auto_enabled", settingValue: "false", settingType: "boolean", updatedAt: timestamp });
 }
 function seedPurchaseOrders(db) {
-  const count = db.prepare("SELECT COUNT(*) AS count FROM purchase_orders").get();
-  if (count.count > 0) {
-    return;
-  }
+  const existingPos = db.prepare("SELECT order_code FROM purchase_orders").all();
+  const existingCodes = new Set(existingPos.map((p) => p.order_code));
   const manufacturerLookup = /* @__PURE__ */ new Map();
   const userLookup = /* @__PURE__ */ new Map();
   const manufacturers = db.prepare("SELECT id, name FROM manufacturers").all();
@@ -479,6 +695,7 @@ function seedPurchaseOrders(db) {
     )
   `);
   for (const order of SEED_PURCHASE_ORDERS) {
+    if (existingCodes.has(order.orderCode)) continue;
     const timestamp = nowIso();
     const orderResult = insertOrder.run({
       ...order,
@@ -621,8 +838,9 @@ class OrdersService {
   }
 }
 class PosService {
-  constructor(inventoryRepository) {
+  constructor(inventoryRepository, salesRepository) {
     this.inventoryRepository = inventoryRepository;
+    this.salesRepository = salesRepository;
   }
   listCatalog(query) {
     return this.inventoryRepository.list({
@@ -630,6 +848,17 @@ class PosService {
       includeInactive: false,
       onlySellable: true
     });
+  }
+  checkout(payload) {
+    if (!payload.items || payload.items.length === 0) {
+      throw new Error("Cannot checkout with an empty cart");
+    }
+    if (payload.requiresPrescription) {
+      if (!payload.doctorName || !payload.doctorLicense) {
+        throw new Error("Doctor information is required for prescription items");
+      }
+    }
+    this.salesRepository.createSale(payload);
   }
 }
 class SettingsService {
@@ -1485,12 +1714,135 @@ class UsersRepository {
     return row.count;
   }
 }
+class SalesRepository {
+  constructor(db) {
+    this.db = db;
+  }
+  createSale(payload) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const txn = this.db.transaction(() => {
+      const txnCode = `TXN-${Date.now()}`;
+      const insertSalesTxn = this.db.prepare(`
+        INSERT INTO sales_transactions (
+          transaction_code, cashier_user_id, customer_name, subtotal, discount_type,
+          discount_value, discount_amount, total, cash_tendered, change_amount,
+          payment_status, requires_prescription, doctor_name, doctor_license, created_at
+        ) VALUES (
+          @txnCode, @cashierUserId, @customerName, @subtotal, @discountType,
+          @discountValue, @discountAmount, @total, @cashTendered, @changeAmount,
+          'COMPLETED', @requiresPrescription, @doctorName, @doctorLicense, @createdAt
+        )
+      `);
+      const salesResult = insertSalesTxn.run({
+        txnCode,
+        cashierUserId: payload.cashierUserId ?? null,
+        customerName: payload.customerName ?? null,
+        subtotal: payload.subtotal,
+        discountType: payload.discountType ?? null,
+        discountValue: payload.discountValue ?? null,
+        discountAmount: payload.discountAmount,
+        total: payload.total,
+        cashTendered: payload.cashTendered,
+        changeAmount: payload.changeAmount,
+        requiresPrescription: payload.requiresPrescription ? 1 : 0,
+        doctorName: payload.doctorName ?? null,
+        doctorLicense: payload.doctorLicense ?? null,
+        createdAt: timestamp
+      });
+      const salesTxnId = Number(salesResult.lastInsertRowid);
+      const insertPayment = this.db.prepare(`
+        INSERT INTO payments (
+          sales_transaction_id, method, amount, received_by_user_id, created_at
+        ) VALUES (
+          @salesTxnId, @method, @amount, @receivedByUserId, @createdAt
+        )
+      `);
+      insertPayment.run({
+        salesTxnId,
+        method: payload.paymentMethod,
+        amount: payload.total,
+        // Store the actual amount paid for the sale
+        receivedByUserId: payload.cashierUserId ?? null,
+        createdAt: timestamp
+      });
+      const insertItem = this.db.prepare(`
+        INSERT INTO sales_transaction_items (
+          sales_transaction_id, product_id, product_batch_id, product_name,
+          lot_number, expiry_date, quantity, sell_by_piece, unit_label,
+          unit_price, discount_amount, line_total, created_at
+        ) VALUES (
+          @salesTxnId, @productId, @productBatchId, @productName,
+          @lotNumber, @expiryDate, @quantity, @sellByPiece, @unitLabel,
+          @unitPrice, @discountAmount, @lineTotal, @createdAt
+        )
+      `);
+      const updateBatch = this.db.prepare(`
+        UPDATE product_batches 
+        SET stock_pieces = stock_pieces - @pieces, updated_at = @updatedAt
+        WHERE id = @batchId
+      `);
+      const updateProduct = this.db.prepare(`
+        UPDATE products
+        SET total_stock_pieces = total_stock_pieces - @pieces, sales_count = sales_count + @quantity, updated_at = @updatedAt
+        WHERE id = @productId
+      `);
+      const insertMovement = this.db.prepare(`
+        INSERT INTO inventory_movements (
+          product_id, product_batch_id, movement_type, quantity_pieces, reference_type,
+          reference_id, reason, performed_by_user_id, created_at
+        ) VALUES (
+          @productId, @productBatchId, 'SALE', @pieces, 'SALES_TRANSACTION',
+          @referenceId, 'Sold via POS', @userId, @createdAt
+        )
+      `);
+      for (const item of payload.items) {
+        insertItem.run({
+          salesTxnId,
+          productId: item.productId,
+          productBatchId: item.productBatchId ?? null,
+          productName: item.productName,
+          lotNumber: item.lotNumber ?? null,
+          expiryDate: item.expiryDate ?? null,
+          quantity: item.quantity,
+          sellByPiece: item.sellByPiece ? 1 : 0,
+          unitLabel: item.unitLabel,
+          unitPrice: item.unitPrice,
+          discountAmount: item.discountAmount,
+          lineTotal: item.lineTotal,
+          createdAt: timestamp
+        });
+        if (item.productBatchId) {
+          const p = this.db.prepare("SELECT pieces_per_unit FROM products WHERE id = ?").get(item.productId);
+          const pieces = item.sellByPiece ? item.quantity : item.quantity * p.pieces_per_unit;
+          updateBatch.run({ pieces, updatedAt: timestamp, batchId: item.productBatchId });
+          updateProduct.run({ pieces, quantity: item.quantity, updatedAt: timestamp, productId: item.productId });
+          insertMovement.run({
+            productId: item.productId,
+            productBatchId: item.productBatchId,
+            pieces,
+            // Positive value for quantity
+            referenceId: txnCode,
+            userId: payload.cashierUserId ?? null,
+            createdAt: timestamp
+          });
+          const updatedP = this.db.prepare("SELECT total_stock_pieces, pieces_per_unit FROM products WHERE id = ?").get(item.productId);
+          let status = "In Stock";
+          if (updatedP.total_stock_pieces <= 0) status = "Out of Stock";
+          else if (updatedP.total_stock_pieces <= updatedP.pieces_per_unit) status = "Low Stock";
+          this.db.prepare("UPDATE products SET status = ? WHERE id = ?").run(status, item.productId);
+        }
+      }
+    });
+    txn();
+  }
+}
 function createAppServices(databaseManager2) {
   const inventoryRepository = new InventoryRepository(databaseManager2.db);
   const usersRepository = new UsersRepository(databaseManager2.db);
   const manufacturersRepository = new ManufacturersRepository(databaseManager2.db);
   const ordersRepository = new OrdersRepository(databaseManager2.db);
   const settingsRepository = new SettingsRepository(databaseManager2.db);
+  const salesRepository = new SalesRepository(databaseManager2.db);
   const systemRepository = new SystemRepository(
     databaseManager2.db,
     databaseManager2.dbPath,
@@ -1500,7 +1852,7 @@ function createAppServices(databaseManager2) {
   return {
     systemService: new SystemService(systemRepository),
     inventoryService: new InventoryService(inventoryRepository),
-    posService: new PosService(inventoryRepository),
+    posService: new PosService(inventoryRepository, salesRepository),
     ordersService: new OrdersService(ordersRepository),
     adminService: new AdminService(usersRepository, manufacturersRepository),
     settingsService: new SettingsService(settingsRepository)
@@ -1531,6 +1883,7 @@ function registerIpcHandlers(services) {
     ({ productId, batch }) => services.inventoryService.receiveBatch(productId, batch)
   );
   registerHandler("pos:listCatalog", (query) => services.posService.listCatalog(query));
+  registerHandler("pos:checkout", (payload) => services.posService.checkout(payload));
   registerHandler("orders:list", (query) => services.ordersService.list(query));
   registerHandler(
     "orders:updateStatus",
@@ -1557,12 +1910,15 @@ function createWindow() {
     title: "BotikaPlus",
     icon: path.join(process.env.APP_ROOT, "frontend", "assets", "logos", "logo.png"),
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname$1, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
+  win.maximize();
+  win.show();
   win.setMenuBarVisibility(false);
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);

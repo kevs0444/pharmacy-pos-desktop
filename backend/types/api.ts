@@ -115,6 +115,37 @@ export interface AdminUserListQuery extends PaginationQuery {
   status?: UserStatus | 'All'
 }
 
+export interface CheckoutItemInput {
+  productId: number
+  productBatchId?: number
+  productName: string
+  lotNumber?: string
+  expiryDate?: string
+  quantity: number
+  sellByPiece: boolean
+  unitLabel: string
+  unitPrice: number
+  discountAmount: number
+  lineTotal: number
+}
+
+export interface CheckoutPayload {
+  cashierUserId?: number
+  customerName?: string
+  subtotal: number
+  discountType?: string
+  discountValue?: number
+  discountAmount: number
+  total: number
+  cashTendered: number
+  changeAmount: number
+  paymentMethod: 'Cash' | 'GCash' | 'Card' | 'Other'
+  requiresPrescription: boolean
+  doctorName?: string
+  doctorLicense?: string
+  items: CheckoutItemInput[]
+}
+
 export interface PharmacyApi {
   system: {
     getStatus: () => Promise<DatabaseStatus>
@@ -132,6 +163,7 @@ export interface PharmacyApi {
   }
   pos: {
     listCatalog: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
+    checkout: (payload: CheckoutPayload) => Promise<void>
   }
   orders: {
     list: (query?: OrderListQuery) => Promise<PaginatedResult<PurchaseOrderRecord>>

@@ -34,9 +34,17 @@ export function formatStock(item: InventoryItem): { label: string; isLow: boolea
   const remainder = total % ppu;
   const isLow     = total <= ppu * 1.5;
   let label = "";
-  if (fullUnits > 0)  label += `${fullUnits} ${item.packagingUnit}${fullUnits !== 1 ? "s" : ""}`;
-  if (remainder > 0)  label += `${fullUnits > 0 ? ", " : ""}${remainder} ${item.baseUnit}${remainder !== 1 ? "s" : ""}`;
-  if (!label)         label  = "Out of Stock";
+  if (fullUnits > 0) {
+    const isBox = item.packagingUnit.toLowerCase() === 'box';
+    const suffix = fullUnits !== 1 ? (isBox ? "es" : "s") : "";
+    label += `${fullUnits} ${item.packagingUnit}${suffix}`;
+  }
+  if (remainder > 0) {
+    const isBox = item.baseUnit.toLowerCase() === 'box';
+    const suffix = remainder !== 1 ? (isBox ? "es" : "s") : "";
+    label += `${fullUnits > 0 ? ", " : ""}${remainder} ${item.baseUnit}${suffix}`;
+  }
+  if (!label) label = "Out of Stock";
 
   return { label, isLow, isOut };
 }
@@ -132,44 +140,43 @@ export function ProductCard({ product, viewMode, onAction, disabled }: ProductCa
         <p className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">{product.manufacturer || "Generic"}</p>
       </div>
 
-      {/* Expiry Badge */}
-      <div className="mb-3">
-        <ExpiryBadge item={product} />
-      </div>
+      <div className="flex flex-col mt-auto">
+        {/* Expiry Badge */}
+        <div className="h-[24px] mb-2 flex items-start">
+          <ExpiryBadge item={product} />
+        </div>
 
-      {/* Price + Stock */}
-      <div className="flex justify-between items-end mb-4">
-        <div className="flex flex-col gap-0.5">
-          {product.discount ? (
-            <>
+        {/* Price + Stock */}
+        <div className="flex justify-between items-end h-[48px] mb-4">
+          <div className="flex flex-col gap-0.5 justify-end h-full">
+            <div className="flex items-center gap-2 mb-0.5">
               <span className="text-xl font-black text-slate-900 leading-none">₱{displayPrice.toFixed(2)}</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] font-bold text-slate-400 line-through">₱{product.sellingPricePerUnit.toFixed(2)}</span>
-                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100/50">-{product.discount}%</span>
-              </div>
-            </>
-          ) : (
-            <span className="text-xl font-black text-slate-900 leading-none">₱{displayPrice.toFixed(2)}</span>
-          )}
-          <span className="text-[9px] text-slate-400 font-semibold">per {product.packagingUnit}</span>
-          {showDualPricing && (
-            <span className="text-[9px] text-brand-blue font-bold">₱{product.sellingPricePerPiece.toFixed(2)} / {product.baseUnit}</span>
-          )}
-        </div>
-
-        <div className="flex flex-col items-end gap-1">
-          {stockInfo.isOut ? (
-            <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">Out of Stock</span>
-          ) : stockInfo.isLow ? (
-            <div className="flex items-center gap-1 text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100/50">
-              <TriangleAlert className="w-3 h-3 stroke-[2.5]" />
-              <span className="text-[10px] font-bold">{stockInfo.label}</span>
+              {product.discount ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 line-through">₱{product.sellingPricePerUnit.toFixed(2)}</span>
+                  <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100/50">-{product.discount}%</span>
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <span className="text-[10px] font-bold text-slate-400">{stockInfo.label}</span>
-          )}
+            <span className="text-[9px] text-slate-400 font-semibold">per {product.packagingUnit}</span>
+            {showDualPricing && (
+              <span className="text-[9px] text-brand-blue font-bold">₱{product.sellingPricePerPiece.toFixed(2)} / {product.baseUnit}</span>
+            )}
+          </div>
+
+          <div className="flex flex-col items-end gap-1 justify-end h-full text-right">
+            {stockInfo.isOut ? (
+              <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">Out of Stock</span>
+            ) : stockInfo.isLow ? (
+              <div className="flex items-center gap-1 text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100/50">
+                <TriangleAlert className="w-3 h-3 stroke-[2.5]" />
+                <span className="text-[10px] font-bold text-right">{stockInfo.label}</span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-bold text-slate-400 text-right">{stockInfo.label}</span>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Action */}
       {viewMode === "pos" ? (
@@ -188,6 +195,7 @@ export function ProductCard({ product, viewMode, onAction, disabled }: ProductCa
           View Details <ChevronRight className="w-4 h-4" />
         </button>
       )}
+      </div>
     </div>
   );
 }

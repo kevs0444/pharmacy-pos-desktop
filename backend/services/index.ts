@@ -11,6 +11,7 @@ import { OrdersRepository } from '../repositories/ordersRepository'
 import { SettingsRepository } from '../repositories/settingsRepository'
 import { SystemRepository } from '../repositories/systemRepository'
 import { UsersRepository } from '../repositories/usersRepository'
+import { SalesRepository } from '../repositories/salesRepository'
 
 export interface AppServices {
   systemService: SystemService
@@ -27,6 +28,7 @@ export function createAppServices(databaseManager: DatabaseManager): AppServices
   const manufacturersRepository = new ManufacturersRepository(databaseManager.db)
   const ordersRepository = new OrdersRepository(databaseManager.db)
   const settingsRepository = new SettingsRepository(databaseManager.db)
+  const salesRepository = new SalesRepository(databaseManager.db)
   const systemRepository = new SystemRepository(
     databaseManager.db,
     databaseManager.dbPath,
@@ -37,7 +39,7 @@ export function createAppServices(databaseManager: DatabaseManager): AppServices
   return {
     systemService: new SystemService(systemRepository),
     inventoryService: new InventoryService(inventoryRepository),
-    posService: new PosService(inventoryRepository),
+    posService: new PosService(inventoryRepository, salesRepository),
     ordersService: new OrdersService(ordersRepository),
     adminService: new AdminService(usersRepository, manufacturersRepository),
     settingsService: new SettingsService(settingsRepository),

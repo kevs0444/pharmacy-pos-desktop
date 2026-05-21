@@ -128,11 +128,8 @@ export function seedDatabase(db: Database.Database): void {
 }
 
 function seedUsers(db: Database.Database): void {
-  const count = db.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number }
-
-  if (count.count > 0) {
-    return
-  }
+  const existingUsers = db.prepare('SELECT username FROM users').all() as Array<{ username: string }>
+  const existingUsernames = new Set(existingUsers.map(u => u.username))
 
   const insert = db.prepare(`
     INSERT INTO users (
@@ -143,6 +140,8 @@ function seedUsers(db: Database.Database): void {
   `)
 
   for (const user of SEED_USERS) {
+    if (existingUsernames.has(user.username)) continue
+
     const timestamp = nowIso()
     insert.run({
       ...user,
@@ -154,11 +153,8 @@ function seedUsers(db: Database.Database): void {
 }
 
 function seedManufacturers(db: Database.Database): void {
-  const count = db.prepare('SELECT COUNT(*) AS count FROM manufacturers').get() as { count: number }
-
-  if (count.count > 0) {
-    return
-  }
+  const existingMfrs = db.prepare('SELECT name FROM manufacturers').all() as Array<{ name: string }>
+  const existingNames = new Set(existingMfrs.map(m => m.name))
 
   const insert = db.prepare(`
     INSERT INTO manufacturers (
@@ -169,6 +165,8 @@ function seedManufacturers(db: Database.Database): void {
   `)
 
   for (const manufacturer of SEED_MANUFACTURERS) {
+    if (existingNames.has(manufacturer.name)) continue
+
     const timestamp = nowIso()
     insert.run({
       ...manufacturer,
@@ -178,11 +176,252 @@ function seedManufacturers(db: Database.Database): void {
   }
 }
 
-function seedProducts(db: Database.Database): void {
-  const count = db.prepare('SELECT COUNT(*) AS count FROM products').get() as { count: number }
+const SEED_PHARMA_PRODUCTS = [
+  {
+    code: 'PRD-0001',
+    name: 'Biogesic 500mg',
+    genericName: 'Paracetamol',
+    manufacturerName: 'Unilab',
+    brandType: 'Branded',
+    category: 'Medicine',
+    subCategory: 'OTC',
+    packagingUnit: 'Box',
+    baseUnit: 'Tablet',
+    piecesPerUnit: 100,
+    unitPriceCost: 400,
+    sellingPricePerUnit: 500,
+    sellingPricePerPiece: 5.5,
+    discount: 0,
+    salesCount: 150,
+  },
+  {
+    code: 'PRD-0002',
+    name: 'Neozep Forte',
+    genericName: 'Phenylephrine HCl + Chlorphenamine Maleate + Paracetamol',
+    manufacturerName: 'Unilab',
+    brandType: 'Branded',
+    category: 'Medicine',
+    subCategory: 'OTC',
+    packagingUnit: 'Box',
+    baseUnit: 'Tablet',
+    piecesPerUnit: 100,
+    unitPriceCost: 500,
+    sellingPricePerUnit: 650,
+    sellingPricePerPiece: 7.0,
+    discount: 0,
+    salesCount: 120,
+  },
+  {
+    code: 'PRD-0003',
+    name: 'Amoxicillin 500mg',
+    genericName: 'Amoxicillin Trihydrate',
+    manufacturerName: 'Generic Pharma',
+    brandType: 'Generic',
+    category: 'Medicine',
+    subCategory: 'Prescription (Rx)',
+    packagingUnit: 'Box',
+    baseUnit: 'Capsule',
+    piecesPerUnit: 100,
+    unitPriceCost: 200,
+    sellingPricePerUnit: 350,
+    sellingPricePerPiece: 4.0,
+    discount: 0,
+    salesCount: 85,
+  },
+  {
+    code: 'PRD-0004',
+    name: 'Alaxan FR',
+    genericName: 'Ibuprofen + Paracetamol',
+    manufacturerName: 'Unilab',
+    brandType: 'Branded',
+    category: 'Medicine',
+    subCategory: 'OTC',
+    packagingUnit: 'Box',
+    baseUnit: 'Capsule',
+    piecesPerUnit: 100,
+    unitPriceCost: 650,
+    sellingPricePerUnit: 800,
+    sellingPricePerPiece: 8.5,
+    discount: 5,
+    salesCount: 210,
+  },
+  {
+    code: 'PRD-0005',
+    name: 'Losartan Potassium 50mg',
+    genericName: 'Losartan',
+    manufacturerName: 'TGP Generics',
+    brandType: 'Generic',
+    category: 'Medicine',
+    subCategory: 'Prescription (Rx)',
+    packagingUnit: 'Box',
+    baseUnit: 'Tablet',
+    piecesPerUnit: 100,
+    unitPriceCost: 300,
+    sellingPricePerUnit: 450,
+    sellingPricePerPiece: 5.0,
+    discount: 0,
+    salesCount: 300,
+  },
+  {
+    code: 'PRD-0006',
+    name: 'Diatabs 2mg',
+    genericName: 'Loperamide',
+    manufacturerName: 'Unilab',
+    brandType: 'Branded',
+    category: 'Medicine',
+    subCategory: 'OTC',
+    packagingUnit: 'Box',
+    baseUnit: 'Capsule',
+    piecesPerUnit: 100,
+    unitPriceCost: 500,
+    sellingPricePerUnit: 650,
+    sellingPricePerPiece: 7.5,
+    discount: 0,
+    salesCount: 60,
+  }
+] as const
 
-  if (count.count > 0) {
-    return
+function seedProducts(db: Database.Database): void {
+  const existingProducts = db.prepare('SELECT code FROM products').all() as Array<{ code: string }>
+  const existingCodes = new Set(existingProducts.map(p => p.code))
+
+  const manufacturerLookup = new Map<string, number>()
+  const manufacturers = db.prepare('SELECT id, name FROM manufacturers').all() as Array<{ id: number; name: string }>
+  for (const manufacturer of manufacturers) {
+    manufacturerLookup.set(manufacturer.name, manufacturer.id)
+  }
+
+  const insertProduct = db.prepare(`
+    INSERT INTO products (
+      code, name, generic_name, manufacturer_id, brand_type, category, sub_category,
+      packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
+      selling_price_per_unit, selling_price_per_piece, discount, sales_count, status,
+      created_at, updated_at
+    ) VALUES (
+      @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
+      @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
+      @sellingPricePerUnit, @sellingPricePerPiece, @discount, @salesCount, 'In Stock',
+      @createdAt, @updatedAt
+    )
+  `)
+
+  const insertBatch = db.prepare(`
+    INSERT INTO product_batches (
+      product_id, batch_code, lot_number, manufacturing_date, expiry_date,
+      stock_pieces, received_date, created_at, updated_at
+    ) VALUES (
+      @productId, @batchCode, @lotNumber, @manufacturingDate, @expiryDate,
+      @stockPieces, @receivedDate, @createdAt, @updatedAt
+    )
+  `)
+
+  const insertMovement = db.prepare(`
+    INSERT INTO inventory_movements (
+      product_id, product_batch_id, movement_type, quantity_pieces, reason, created_at
+    ) VALUES (
+      @productId, @productBatchId, 'OPENING_BALANCE', @quantityPieces, 'Initial seed data', @createdAt
+    )
+  `)
+
+  for (let i = 0; i < SEED_PHARMA_PRODUCTS.length; i++) {
+    const p = SEED_PHARMA_PRODUCTS[i]
+    if (existingCodes.has(p.code)) continue
+
+    const timestamp = nowIso()
+    // Give each product 2 boxes worth of stock to start
+    const initialStockPieces = p.piecesPerUnit * 2 
+
+    const result = insertProduct.run({
+      ...p,
+      manufacturerId: manufacturerLookup.get(p.manufacturerName) ?? null,
+      totalStockPieces: initialStockPieces,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+
+    const productId = Number(result.lastInsertRowid)
+
+    // Create a batch for this stock
+    const batchResult = insertBatch.run({
+      productId,
+      batchCode: `BATCH-${p.code}-001`,
+      lotNumber: `LOT${Math.floor(Math.random() * 90000) + 10000}`,
+      manufacturingDate: '2025-01-10',
+      expiryDate: '2027-01-10', // ensure it's unexpired
+      stockPieces: initialStockPieces,
+      receivedDate: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+
+    const productBatchId = Number(batchResult.lastInsertRowid)
+
+    // Insert opening movement
+    insertMovement.run({
+      productId,
+      productBatchId,
+      quantityPieces: initialStockPieces,
+      createdAt: timestamp
+    })
+  }
+
+  // Generate 1000 dummy products for performance testing
+  const generateCount = 1000;
+  if (existingCodes.size < generateCount) {
+    const manufacturerIds = Array.from(manufacturerLookup.values());
+    const manufacturerId = manufacturerIds.length > 0 ? manufacturerIds[0] : null;
+
+    for (let i = 1; i <= generateCount; i++) {
+      const code = `DUMMY-${i.toString().padStart(4, '0')}`;
+      if (existingCodes.has(code)) continue;
+
+      const timestamp = nowIso();
+      const basePrice = Math.floor(Math.random() * 500) + 50;
+      const ppu = 100;
+      const initialStockPieces = ppu * 5; // 5 boxes
+
+      const result = insertProduct.run({
+        code,
+        name: `Test Medicine ${i}`,
+        genericName: `Generic Form ${i}`,
+        manufacturerId,
+        brandType: 'Generic',
+        category: 'Pharmaceutical',
+        subCategory: 'Over-the-Counter (OTC)',
+        packagingUnit: 'Box',
+        baseUnit: 'Tablet',
+        piecesPerUnit: ppu,
+        totalStockPieces: initialStockPieces,
+        unitPriceCost: basePrice * 0.8,
+        sellingPricePerUnit: basePrice,
+        sellingPricePerPiece: (basePrice / ppu) * 1.5,
+        discount: 0,
+        salesCount: Math.floor(Math.random() * 100),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      const productId = Number(result.lastInsertRowid);
+
+      const batchResult = insertBatch.run({
+        productId,
+        batchCode: `BATCH-${code}-001`,
+        lotNumber: `LOT${Math.floor(Math.random() * 90000) + 10000}`,
+        manufacturingDate: '2025-01-10',
+        expiryDate: '2027-01-10',
+        stockPieces: initialStockPieces,
+        receivedDate: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+
+      insertMovement.run({
+        productId,
+        productBatchId: Number(batchResult.lastInsertRowid),
+        quantityPieces: initialStockPieces,
+        createdAt: timestamp
+      });
+    }
   }
 }
 
@@ -226,11 +465,8 @@ function seedAppSettings(db: Database.Database): void {
 }
 
 function seedPurchaseOrders(db: Database.Database): void {
-  const count = db.prepare('SELECT COUNT(*) AS count FROM purchase_orders').get() as { count: number }
-
-  if (count.count > 0) {
-    return
-  }
+  const existingPos = db.prepare('SELECT order_code FROM purchase_orders').all() as Array<{ order_code: string }>
+  const existingCodes = new Set(existingPos.map(p => p.order_code))
 
   const manufacturerLookup = new Map<string, number>()
   const userLookup = new Map<string, number>()
@@ -266,6 +502,8 @@ function seedPurchaseOrders(db: Database.Database): void {
   `)
 
   for (const order of SEED_PURCHASE_ORDERS) {
+    if (existingCodes.has(order.orderCode)) continue
+
     const timestamp = nowIso()
     const orderResult = insertOrder.run({
       ...order,

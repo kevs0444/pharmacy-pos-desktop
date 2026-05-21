@@ -7,6 +7,7 @@ import { Sales } from "./components/Sales";
 import { Orders } from "./components/Orders";
 import { POS } from "./components/POS";
 import { Admin } from "./components/Admin";
+import { Manufacturers } from "./components/Manufacturers";
 import { Login, UserRole } from "./components/Login";
 import { Profile } from "./components/Profile";
 
@@ -27,6 +28,7 @@ function App() {
         {activeTab === "POS Terminal" && <POS />}
         {activeTab === "Dashboard" && <Dashboard userRole={userRole} />}
         {activeTab === "Admin Panel" && <Admin />}
+        {activeTab === "Manufacturers" && <Manufacturers />}
         {activeTab === "Profile" && <Profile />}
         {activeTab === "Inventory" && <Inventory />}
         {activeTab === "Sales" && <Sales />}

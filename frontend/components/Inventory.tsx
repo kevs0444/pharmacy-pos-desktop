@@ -36,6 +36,7 @@ const emptyForm = () => ({
 
 export function Inventory() {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [dbManufacturers, setDbManufacturers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [alertTab, setAlertTab] = useState<"restock" | "expiring" | "pending">("restock");
   const [filterStockStatus, setFilterStockStatus] = useState<"All" | "In Stock" | "Low Stock" | "Out of Stock" | "Expiring">("All");
@@ -78,6 +79,9 @@ export function Inventory() {
 
   useEffect(() => {
     void loadInventory();
+    window.api.admin.listManufacturers().then(mfgResult => {
+      setDbManufacturers(mfgResult.map((m: any) => m.name));
+    }).catch(console.error);
   }, []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -293,7 +297,10 @@ export function Inventory() {
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacturer</label>
                       <div className="relative">
                         <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input type="text" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className={cn(inputClass, "pl-9")} placeholder="e.g. Unilab" />
+                        <input type="text" list="manufacturers-list" value={formData.manufacturer} onChange={e => setFormData({...formData, manufacturer: e.target.value})} className={cn(inputClass, "pl-9")} placeholder="e.g. Unilab" />
+                        <datalist id="manufacturers-list">
+                          {dbManufacturers.map(m => <option key={m} value={m} />)}
+                        </datalist>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -1031,24 +1038,26 @@ export function Inventory() {
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    // Smart page numbers for large datasets
-                    let page: number;
-                    if (totalPages <= 7) page = i + 1;
-                    else if (i === 0) page = 1;
-                    else if (i === 6) page = totalPages;
-                    else if (currentPage <= 3) page = i + 1;
-                    else if (currentPage >= totalPages - 2) page = totalPages - 6 + i;
-                    else page = currentPage - 2 + i;
-                    return (
-                      <button key={page} onClick={() => setCurrentPage(page)}
-                        className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
-                          currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
-                        )}>
-                        {page}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    const getPageNumbers = (current: number, total: number) => {
+                      if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+                      if (current <= 3) return [1, 2, 3, 4, '...', total];
+                      if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+                      return [1, '...', current - 1, current, current + 1, '...', total];
+                    };
+                    return getPageNumbers(currentPage, totalPages).map((page, i) => (
+                      page === '...' ? (
+                         <span key={`dots-${i}`} className="px-2 py-1 text-slate-400 font-bold">...</span>
+                      ) : (
+                         <button key={`page-${page}`} onClick={() => setCurrentPage(page as number)}
+                           className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
+                             currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
+                           )}>
+                           {page}
+                         </button>
+                      )
+                    ));
+                  })()}
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
                     className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
                     <ChevronRight className="w-4 h-4" />

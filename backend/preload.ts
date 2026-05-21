@@ -1,6 +1,7 @@
 import { ipcRenderer, contextBridge } from 'electron';
 import type {
   AdminUserListQuery,
+  CheckoutPayload,
   CreateProductInput,
   InventoryListQuery,
   OrderListQuery,
@@ -27,6 +28,7 @@ const api: PharmacyApi = {
   },
   pos: {
     listCatalog: (query?: InventoryListQuery) => ipcRenderer.invoke('pos:listCatalog', query),
+    checkout: (payload: CheckoutPayload) => ipcRenderer.invoke('pos:checkout', payload),
   },
   orders: {
     list: (query?: OrderListQuery) => ipcRenderer.invoke('orders:list', query),

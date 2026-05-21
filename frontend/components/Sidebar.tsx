@@ -7,7 +7,8 @@ import {
   LogOut,
   UserCircle,
   ShieldCheck,
-  Menu
+  Menu,
+  Building2
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -17,11 +18,12 @@ const settingsNav = [
   { name: "POS Terminal", icon: MonitorPlay },
   { name: "Inventory", icon: Package },
   { name: "Orders", icon: ShoppingCart },
+  { name: "Manufacturers", icon: Building2 },
   { name: "Dashboard", icon: LayoutDashboard },
   { name: "Admin Panel", icon: ShieldCheck },
 ];
 
-export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel";
+export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel" | "Manufacturers";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -74,6 +76,10 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
             {settingsNav.map((item) => {
               // Conditionally hide "Admin Panel" if userRole is not Admin
               if (item.name === "Admin Panel" && userRole !== "Admin") {
+                 return null;
+              }
+              // Hide Manufacturers if userRole is Staff
+              if (item.name === "Manufacturers" && userRole === "Staff") {
                  return null;
               }
 

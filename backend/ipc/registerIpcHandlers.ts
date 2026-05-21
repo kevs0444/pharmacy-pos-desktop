@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type {
   AdminUserListQuery,
+  CheckoutPayload,
   CreateProductInput,
   InventoryListQuery,
   OrderListQuery,
@@ -33,6 +34,7 @@ export function registerIpcHandlers(services: AppServices): void {
     services.inventoryService.receiveBatch(productId, batch),
   )
   registerHandler<InventoryListQuery | undefined>('pos:listCatalog', (query) => services.posService.listCatalog(query))
+  registerHandler<CheckoutPayload>('pos:checkout', (payload) => services.posService.checkout(payload))
   registerHandler<OrderListQuery | undefined>('orders:list', (query) => services.ordersService.list(query))
   registerHandler<{ orderId: number; status: OrderStatus }>('orders:updateStatus', ({ orderId, status }) =>
     services.ordersService.updateStatus(orderId, status),

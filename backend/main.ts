@@ -29,12 +29,16 @@ function createWindow() {
     title: 'BotikaPlus',
     icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.png'),
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   })
+
+  win.maximize()
+  win.show()
 
   // Prevent menubar from appearing even if ALT is pressed.
   win.setMenuBarVisibility(false)
