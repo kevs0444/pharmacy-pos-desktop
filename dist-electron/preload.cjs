@@ -9,9 +9,17 @@ const api = {
     update: (id, payload) => ipcRenderer.invoke("inventory:update", { id, payload }),
     remove: (id) => ipcRenderer.invoke("inventory:remove", id),
     setActive: (id, isActive) => ipcRenderer.invoke("inventory:setActive", { id, isActive }),
-    listBatches: (productId) => ipcRenderer.invoke("inventory:listBatches", productId)
+    listBatches: (productId) => ipcRenderer.invoke("inventory:listBatches", productId),
+    submitChangeRequest: (input) => ipcRenderer.invoke("inventory:submitChangeRequest", input),
+    listChangeRequests: (status) => ipcRenderer.invoke("inventory:listChangeRequests", status),
+    reviewChangeRequest: (id, input) => ipcRenderer.invoke("inventory:reviewChangeRequest", { id, input }),
   },
-  pos: { listCatalog: (q) => ipcRenderer.invoke("pos:listCatalog", q) },
+  pos: { 
+    listCatalog: (q) => ipcRenderer.invoke("pos:listCatalog", q),
+    checkout: (payload) => ipcRenderer.invoke("pos:checkout", payload),
+    searchCustomers: (query) => ipcRenderer.invoke("pos:searchCustomers", query),
+    saveCustomer: (input) => ipcRenderer.invoke("pos:saveCustomer", input)
+  },
   orders: { list: (q) => ipcRenderer.invoke("orders:list", q) },
   admin: { 
     listUsers: (q) => ipcRenderer.invoke("admin:listUsers", q), 

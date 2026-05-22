@@ -30,7 +30,6 @@ const emptyForm = () => ({
   discount: "",
   // Batch fields
   lotNumber: "",
-  manufacturingDate: "",
   expiryDate: ""
 });
 
@@ -147,7 +146,6 @@ export function Inventory() {
       sellingPricePerPiece: String(item.sellingPricePerPiece),
       discount: String(item.discount || ""),
       lotNumber: firstBatch?.lotNumber || "",
-      manufacturingDate: firstBatch?.manufacturingDate || "",
       expiryDate: firstBatch?.expiryDate || ""
     });
     setIsModalOpen(true);
@@ -180,7 +178,11 @@ export function Inventory() {
           isActive: editingItem.isActive,
           salesCount: editingItem.salesCount,
         };
-        await window.api.inventory.update(editingItem.id, payload);
+        await window.api.inventory.submitChangeRequest({
+          requestType: 'UPDATE',
+          productId: editingItem.id,
+          payload,
+        });
       } else {
         const payload: CreateProductInput = {
           code: formData.code,
@@ -200,19 +202,21 @@ export function Inventory() {
           discount: Number.isFinite(discountValue) ? discountValue : null,
           initialBatch: formData.expiryDate ? {
             lotNumber: formData.lotNumber || `LOT-${Date.now()}`,
-            manufacturingDate: formData.manufacturingDate || new Date().toISOString().split("T")[0],
+            manufacturingDate: new Date().toISOString().split("T")[0],
             expiryDate: formData.expiryDate,
             stockPieces: totalStock,
             receivedDate: new Date().toISOString().split("T")[0],
           } : undefined,
         };
-        await window.api.inventory.create(payload);
+        await window.api.inventory.submitChangeRequest({
+          requestType: 'CREATE',
+          payload,
+        });
       }
-      await loadInventory();
       window.dispatchEvent(new CustomEvent('app-success', {
-        detail: { 
-          title: editingItem ? "Product Updated" : "Product Added", 
-          message: `${formData.name} has been successfully saved to inventory.` 
+        detail: {
+          title: "Change Submitted for Review",
+          message: `"${formData.name}" has been queued for Manager/Admin approval.`
         }
       }));
       setIsModalOpen(false);
@@ -220,10 +224,11 @@ export function Inventory() {
       setFormData(emptyForm());
     } catch (e: any) {
       window.dispatchEvent(new CustomEvent('app-error', {
-        detail: { title: "Save Product Error", message: e.message || String(e) }
+        detail: { title: "Submit Change Error", message: e.message || String(e) }
       }));
     }
   };
+
 
   // Memoized filtering — safe for 10,000+ products
   const sortedFilteredItems = useMemo(() => {
@@ -381,9 +386,9 @@ export function Inventory() {
                     <Package className="w-4 h-4 text-brand-green" /> Stock & Batch Tracking
                   </h3>
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-medium text-amber-700">
-                    📦 <strong>Batch / Lot:</strong> Each delivery should be tracked as a separate batch. Enter the lot number from the manufacturer label, along with the manufacturing and expiry dates. The system uses <strong>FEFO</strong> (First Expired, First Out) to auto-select the correct batch when selling.
+                    📦 <strong>Batch / Lot:</strong> Each delivery should be tracked as a separate batch. Enter the lot number from the manufacturer label and the expiry date. The system uses <strong>FEFO</strong> (First Expired, First Out) to auto-select the correct batch when selling.
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Initial Stock (in {formData.baseUnit}s)</label>
                       <input type="number" value={formData.totalStockPieces} onChange={e => setFormData({...formData, totalStockPieces: e.target.value})} className={inputClass} placeholder={`e.g. 200 ${formData.baseUnit}s`} />
@@ -396,10 +401,6 @@ export function Inventory() {
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Lot / Batch Number</label>
                       <input type="text" value={formData.lotNumber} onChange={e => setFormData({...formData, lotNumber: e.target.value})} className={cn(inputClass, "font-mono")} placeholder="e.g. LOT-2026-AMX-01" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-red-400 uppercase tracking-wider">Manufacturing Date *</label>
-                      <input type="date" value={formData.manufacturingDate} onChange={e => setFormData({...formData, manufacturingDate: e.target.value})} className={cn(inputClass, "text-slate-700 font-medium")} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-red-400 uppercase tracking-wider">Expiry Date *</label>
@@ -464,8 +465,8 @@ export function Inventory() {
 
               <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100 shrink-0">
                 <button onClick={() => { setIsModalOpen(false); setEditingItem(null); }} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
-                <button onClick={handleSave} className="px-8 py-3 bg-brand-green hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-brand-green/20 transition-all flex items-center gap-2 active:scale-95">
-                  <Save className="w-5 h-5" /> {editingItem ? "Update Item" : "Save Item"}
+                <button onClick={handleSave} className="px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2 active:scale-95">
+                  <Save className="w-5 h-5" /> Submit for Review
                 </button>
               </div>
             </div>
@@ -667,10 +668,6 @@ export function Inventory() {
                                     )}>
                                       {nextBatch.expiryDate}
                                     </span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase w-9">Mfg</span>
-                                    <span className="text-xs text-slate-400 font-medium">{nextBatch.manufacturingDate}</span>
                                   </div>
                                 </div>
                               ) : (

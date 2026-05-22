@@ -1,4 +1,8 @@
 import type {
+  ChangeRequestRecord,
+  ChangeRequestStatus,
+  ChangeRequestType,
+  CustomerRecord,
   DatabaseStatus,
   ManufacturerRecord,
   OrderPriority,
@@ -100,6 +104,30 @@ export interface UpdateProductInput {
   salesCount: number
 }
 
+export interface SubmitChangeRequestInput {
+  requestType: ChangeRequestType
+  productId?: number
+  submittedByName?: string
+  payload: CreateProductInput | UpdateProductInput | { productId: number }
+}
+
+export interface ReviewChangeRequestInput {
+  approved: boolean
+  reviewedByName?: string
+  reviewerNote?: string
+}
+
+export interface CustomerSearchQuery {
+  query: string
+  idType?: 'Senior' | 'PWD'
+}
+
+export interface CustomerSaveInput {
+  name: string
+  idType: 'Senior' | 'PWD'
+  idNumber: string
+}
+
 export interface OrderListQuery extends PaginationQuery {
   search?: string
   manufacturer?: string
@@ -160,10 +188,15 @@ export interface PharmacyApi {
     setActive: (id: number, isActive: boolean) => Promise<ProductRecord>
     listBatches: (productId: number) => Promise<ProductBatchRecord[]>
     receiveBatch: (productId: number, batch: ProductBatchInput) => Promise<void>
+    submitChangeRequest: (input: SubmitChangeRequestInput) => Promise<ChangeRequestRecord>
+    listChangeRequests: (status?: ChangeRequestStatus) => Promise<ChangeRequestRecord[]>
+    reviewChangeRequest: (id: number, input: ReviewChangeRequestInput) => Promise<void>
   }
   pos: {
     listCatalog: (query?: InventoryListQuery) => Promise<PaginatedResult<ProductRecord>>
     checkout: (payload: CheckoutPayload) => Promise<void>
+    searchCustomers: (query: CustomerSearchQuery) => Promise<CustomerRecord[]>
+    saveCustomer: (input: CustomerSaveInput) => Promise<CustomerRecord>
   }
   orders: {
     list: (query?: OrderListQuery) => Promise<PaginatedResult<PurchaseOrderRecord>>

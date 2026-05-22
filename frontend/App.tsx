@@ -10,6 +10,7 @@ import { Admin } from "./components/Admin";
 import { Manufacturers } from "./components/Manufacturers";
 import { Login, UserRole } from "./components/Login";
 import { Profile } from "./components/Profile";
+import { InventoryChangeRequests } from "./components/InventoryChangeRequests";
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>("Dashboard");
@@ -31,6 +32,7 @@ function App() {
         {activeTab === "Manufacturers" && <Manufacturers />}
         {activeTab === "Profile" && <Profile />}
         {activeTab === "Inventory" && <Inventory />}
+        {activeTab === "Pending Changes" && <InventoryChangeRequests />}
         {activeTab === "Sales" && <Sales />}
         {activeTab === "Orders" && <Orders />}
         {/* Reporting routes can map back to sales or dashboard for now */}

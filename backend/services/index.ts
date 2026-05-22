@@ -5,6 +5,8 @@ import { OrdersService } from './ordersService'
 import { PosService } from './posService'
 import { SettingsService } from './settingsService'
 import { SystemService } from './systemService'
+import { ChangeRequestService } from './changeRequestService'
+import { CustomersService } from './customersService'
 import { InventoryRepository } from '../repositories/inventoryRepository'
 import { ManufacturersRepository } from '../repositories/manufacturersRepository'
 import { OrdersRepository } from '../repositories/ordersRepository'
@@ -12,6 +14,8 @@ import { SettingsRepository } from '../repositories/settingsRepository'
 import { SystemRepository } from '../repositories/systemRepository'
 import { UsersRepository } from '../repositories/usersRepository'
 import { SalesRepository } from '../repositories/salesRepository'
+import { ChangeRequestRepository } from '../repositories/changeRequestRepository'
+import { CustomersRepository } from '../repositories/customersRepository'
 
 export interface AppServices {
   systemService: SystemService
@@ -20,6 +24,8 @@ export interface AppServices {
   ordersService: OrdersService
   adminService: AdminService
   settingsService: SettingsService
+  changeRequestService: ChangeRequestService
+  customersService: CustomersService
 }
 
 export function createAppServices(databaseManager: DatabaseManager): AppServices {
@@ -29,6 +35,8 @@ export function createAppServices(databaseManager: DatabaseManager): AppServices
   const ordersRepository = new OrdersRepository(databaseManager.db)
   const settingsRepository = new SettingsRepository(databaseManager.db)
   const salesRepository = new SalesRepository(databaseManager.db)
+  const changeRequestRepository = new ChangeRequestRepository(databaseManager.db)
+  const customersRepository = new CustomersRepository(databaseManager.db)
   const systemRepository = new SystemRepository(
     databaseManager.db,
     databaseManager.dbPath,
@@ -36,12 +44,17 @@ export function createAppServices(databaseManager: DatabaseManager): AppServices
     databaseManager.getAppliedMigrationCount(),
   )
 
+  const inventoryService = new InventoryService(inventoryRepository)
+
   return {
     systemService: new SystemService(systemRepository),
-    inventoryService: new InventoryService(inventoryRepository),
+    inventoryService,
     posService: new PosService(inventoryRepository, salesRepository),
     ordersService: new OrdersService(ordersRepository),
     adminService: new AdminService(usersRepository, manufacturersRepository),
     settingsService: new SettingsService(settingsRepository),
+    changeRequestService: new ChangeRequestService(changeRequestRepository, inventoryService),
+    customersService: new CustomersService(customersRepository),
   }
 }
+

@@ -1,4 +1,4 @@
-import { ipcRenderer, contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AdminUserListQuery,
   CheckoutPayload,
@@ -7,9 +7,13 @@ import type {
   OrderListQuery,
   PharmacyApi,
   ProductBatchInput,
+  ReviewChangeRequestInput,
+  SubmitChangeRequestInput,
   UpdateProductInput,
+  CustomerSearchQuery,
+  CustomerSaveInput,
 } from './types/api'
-import type { OrderStatus } from './types/domain'
+import type { ChangeRequestStatus, OrderStatus } from './types/domain'
 
 const api: PharmacyApi = {
   system: {
@@ -25,10 +29,15 @@ const api: PharmacyApi = {
     setActive: (id: number, isActive: boolean) => ipcRenderer.invoke('inventory:setActive', { id, isActive }),
     listBatches: (productId: number) => ipcRenderer.invoke('inventory:listBatches', productId),
     receiveBatch: (productId: number, batch: ProductBatchInput) => ipcRenderer.invoke('inventory:receiveBatch', { productId, batch }),
+    submitChangeRequest: (input: SubmitChangeRequestInput) => ipcRenderer.invoke('inventory:submitChangeRequest', input),
+    listChangeRequests: (status?: ChangeRequestStatus) => ipcRenderer.invoke('inventory:listChangeRequests', status),
+    reviewChangeRequest: (id: number, input: ReviewChangeRequestInput) => ipcRenderer.invoke('inventory:reviewChangeRequest', { id, input }),
   },
   pos: {
     listCatalog: (query?: InventoryListQuery) => ipcRenderer.invoke('pos:listCatalog', query),
     checkout: (payload: CheckoutPayload) => ipcRenderer.invoke('pos:checkout', payload),
+    searchCustomers: (query: CustomerSearchQuery) => ipcRenderer.invoke('pos:searchCustomers', query),
+    saveCustomer: (input: CustomerSaveInput) => ipcRenderer.invoke('pos:saveCustomer', input),
   },
   orders: {
     list: (query?: OrderListQuery) => ipcRenderer.invoke('orders:list', query),

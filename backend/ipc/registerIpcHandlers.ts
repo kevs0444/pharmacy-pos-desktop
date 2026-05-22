@@ -6,9 +6,13 @@ import type {
   InventoryListQuery,
   OrderListQuery,
   ProductBatchInput,
+  ReviewChangeRequestInput,
+  SubmitChangeRequestInput,
   UpdateProductInput,
+  CustomerSearchQuery,
+  CustomerSaveInput,
 } from '../types/api'
-import type { OrderStatus } from '../types/domain'
+import type { ChangeRequestStatus, OrderStatus } from '../types/domain'
 import type { AppServices } from '../services'
 
 function registerHandler<TPayload>(channel: string, handler: (payload: TPayload) => unknown): void {
@@ -35,6 +39,8 @@ export function registerIpcHandlers(services: AppServices): void {
   )
   registerHandler<InventoryListQuery | undefined>('pos:listCatalog', (query) => services.posService.listCatalog(query))
   registerHandler<CheckoutPayload>('pos:checkout', (payload) => services.posService.checkout(payload))
+  registerHandler<CustomerSearchQuery>('pos:searchCustomers', (query) => services.customersService.search(query))
+  registerHandler<CustomerSaveInput>('pos:saveCustomer', (input) => services.customersService.save(input))
   registerHandler<OrderListQuery | undefined>('orders:list', (query) => services.ordersService.list(query))
   registerHandler<{ orderId: number; status: OrderStatus }>('orders:updateStatus', ({ orderId, status }) =>
     services.ordersService.updateStatus(orderId, status),
@@ -43,4 +49,13 @@ export function registerIpcHandlers(services: AppServices): void {
   registerHandler('admin:listManufacturers', () => services.adminService.listManufacturers())
   registerHandler<any>('admin:createManufacturer', (payload) => services.adminService.createManufacturer(payload))
   registerHandler('settings:getReceiptSettings', () => services.settingsService.getReceiptSettings())
+  registerHandler<SubmitChangeRequestInput>('inventory:submitChangeRequest', (input) =>
+    services.changeRequestService.submit(input),
+  )
+  registerHandler<ChangeRequestStatus | undefined>('inventory:listChangeRequests', (status) =>
+    services.changeRequestService.list(status),
+  )
+  registerHandler<{ id: number; input: ReviewChangeRequestInput }>('inventory:reviewChangeRequest', ({ id, input }) =>
+    services.changeRequestService.review(id, input),
+  )
 }

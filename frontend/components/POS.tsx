@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, CreditCard, Delete, ArrowLeft, CheckCircle2, Pill, ChevronLeft, ChevronRight, LayoutGrid, List, TriangleAlert } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ProductCatalogFilter } from "./ProductCatalogFilter";
-import type { ProductBatchRecord } from "../../backend/types/domain";
 import { InventoryItem, daysUntilExpiry, getSellableBatches, mapBatchRecordToInventoryBatch } from "../lib/inventoryModel";
 import { mapProductRecordToInventoryItem } from "../lib/mappers";
+import type { CustomerRecord, ProductBatchRecord } from "../../backend/types/domain";
 import { ProductCard, formatStock } from "./ProductCard";
 
 const CARD_PAGE_SIZE = 8;
@@ -195,6 +195,37 @@ export function POS() {
   const [discountInfo, setDiscountInfo] = useState<any>(null);
   const [doctorInfo, setDoctorInfo] = useState<any>(null);
 
+  const [discountFullName, setDiscountFullName] = useState("");
+  const [discountIdNumber, setDiscountIdNumber] = useState("");
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerRecord[]>([]);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+
+  useEffect(() => {
+    if (activeModal !== "Senior" && activeModal !== "PWD") return;
+    
+    const query = discountFullName || discountIdNumber;
+    if (query.length < 2) {
+      setCustomerSuggestions([]);
+      setShowCustomerSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await window.api.pos.searchCustomers({
+          query,
+          idType: activeModal
+        });
+        setCustomerSuggestions(results);
+        setShowCustomerSuggestions(results.length > 0);
+      } catch (err) {
+        console.error("Customer search error", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [discountFullName, discountIdNumber, activeModal]);
+
   const needsPrescription = cart.some(item => item.product.subCategory === "Prescription (Rx)");
   const isDoctorInfoMissing = needsPrescription && !doctorInfo;
 
@@ -245,6 +276,18 @@ export function POS() {
           discountAmount: 0,
           lineTotal: getItemPrice(item) * item.qty
         }))
+      }
+
+      if ((discountType === 'Senior' || discountType === 'PWD') && discountInfo) {
+        try {
+          await window.api.pos.saveCustomer({
+            name: discountInfo.fullName,
+            idType: discountType as 'Senior' | 'PWD',
+            idNumber: discountInfo.idNumber
+          });
+        } catch (err) {
+          console.error("Failed to save customer record", err);
+        }
       }
 
       await window.api.pos.checkout(payload)
@@ -376,12 +419,34 @@ export function POS() {
                  </>
                )}
                {(activeModal === "Senior" || activeModal === "PWD") && (
-                 <>
-                   <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
-                     <input name="fullName" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue outline-none font-semibold" placeholder="Juan Dela Cruz" /></div>
-                   <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{activeModal === "Senior" ? "OSCA ID Number" : "PWD ID Number"}</label>
-                     <input name="idNumber" type="text" required className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue outline-none font-semibold" placeholder="ID-12345" /></div>
-                 </>
+                 <div className="relative">
+                   <div className="mb-4">
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+                     <input name="fullName" type="text" required value={discountFullName} onChange={(e) => setDiscountFullName(e.target.value)} onFocus={() => { if (customerSuggestions.length > 0) setShowCustomerSuggestions(true) }} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue outline-none font-semibold" placeholder="Juan Dela Cruz" autoComplete="off" />
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{activeModal === "Senior" ? "OSCA ID Number" : "PWD ID Number"}</label>
+                     <input name="idNumber" type="text" required value={discountIdNumber} onChange={(e) => setDiscountIdNumber(e.target.value)} onFocus={() => { if (customerSuggestions.length > 0) setShowCustomerSuggestions(true) }} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-brand-blue outline-none font-semibold" placeholder="ID-12345" autoComplete="off" />
+                   </div>
+                   
+                   {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                     <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+                       <div className="max-h-48 overflow-y-auto">
+                         {customerSuggestions.map(cust => (
+                           <div key={cust.id} className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                onClick={() => {
+                                  setDiscountFullName(cust.name);
+                                  setDiscountIdNumber(cust.idNumber);
+                                  setShowCustomerSuggestions(false);
+                                }}>
+                             <div className="font-bold text-slate-800 text-sm">{cust.name}</div>
+                             <div className="text-xs text-slate-500 font-medium">ID: {cust.idNumber}</div>
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+                 </div>
                )}
                {activeModal === "Custom" && (
                  <>
@@ -492,9 +557,16 @@ export function POS() {
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 lg:gap-3">
                          {['None', 'Senior', 'PWD', 'Custom'].map(type => (
-                            <button key={type} onClick={() => {
+                            <button key={type} type="button" onClick={() => {
                               if (type === "None") { setDiscountType("None"); setDiscountInfo(null); setCustomDiscountPercent(0); }
-                              else { setActiveModal(type as any); }
+                              else { 
+                                setActiveModal(type as any); 
+                                if (type === "Senior" || type === "PWD") {
+                                  setDiscountFullName("");
+                                  setDiscountIdNumber("");
+                                  setCustomerSuggestions([]);
+                                }
+                              }
                             }}
                               className={cn("py-3 px-2 rounded-xl text-sm font-bold transition-all border-2 flex flex-col items-center justify-center gap-1 min-h-[50px]",
                                 discountType === type ? "bg-brand-blue border-brand-blue text-white shadow-md" : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-300"

@@ -581,6 +581,7 @@ function seedProducts(db: Database.Database): void {
         sellingPricePerPiece: (basePrice / ppu) * 1.5,
         discount: 0,
         salesCount: Math.floor(Math.random() * 100),
+        status: 'In Stock',
         createdAt: timestamp,
         updatedAt: timestamp,
       });

@@ -28,6 +28,9 @@ export type InventoryMovementType =
   | 'WRITE_OFF'
 export type PaymentMethod = 'Cash' | 'GCash' | 'Card' | 'Other'
 export type ReceiptPaperSize = '80mm' | '58mm'
+export type ChangeRequestType = 'CREATE' | 'UPDATE' | 'DELETE'
+export type ChangeRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
 
 export interface ManufacturerRecord {
   id: number
@@ -135,3 +138,26 @@ export interface DatabaseStatus {
   seededProductCount: number
   seededUserCount: number
 }
+
+export interface ChangeRequestRecord {
+  id: number
+  requestType: ChangeRequestType
+  status: ChangeRequestStatus
+  productId: number | null
+  payload: string
+  submittedByName: string | null
+  submittedAt: string
+  reviewedByName: string | null
+  reviewedAt: string | null
+  reviewerNote: string | null
+}
+
+export interface CustomerRecord {
+  id: number
+  name: string
+  idType: 'Senior' | 'PWD'
+  idNumber: string
+  createdAt: string
+  updatedAt: string
+}
+

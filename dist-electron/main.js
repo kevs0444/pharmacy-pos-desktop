@@ -258,7 +258,52 @@ const deleteMockProductsMigration = {
     DELETE FROM products WHERE code LIKE 'PRD-1%';
   `
 };
-const migrations = [initialSchemaMigration, fixCategoriesMigration, deleteMockProductsMigration];
+const inventoryChangeRequestsMigration = {
+  id: "004",
+  name: "inventory_change_requests",
+  up: `
+    CREATE TABLE IF NOT EXISTS inventory_change_requests (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_type    TEXT NOT NULL CHECK(request_type IN ('CREATE','UPDATE','DELETE')),
+      status          TEXT NOT NULL DEFAULT 'PENDING'
+                      CHECK(status IN ('PENDING','APPROVED','REJECTED')),
+      product_id      INTEGER,
+      payload         TEXT NOT NULL,
+      submitted_by_name TEXT,
+      submitted_at    TEXT NOT NULL,
+      reviewed_by_name TEXT,
+      reviewed_at     TEXT,
+      reviewer_note   TEXT,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_change_requests_status ON inventory_change_requests (status, submitted_at);
+  `
+};
+const customersMigration = {
+  id: "005",
+  name: "customers",
+  up: `
+    CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      id_type TEXT NOT NULL CHECK (id_type IN ('Senior', 'PWD')),
+      id_number TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_customers_name ON customers (name);
+    CREATE INDEX IF NOT EXISTS idx_customers_id_number ON customers (id_number);
+  `
+};
+const migrations = [
+  initialSchemaMigration,
+  fixCategoriesMigration,
+  deleteMockProductsMigration,
+  inventoryChangeRequestsMigration,
+  customersMigration
+];
 const KEY_LENGTH = 64;
 function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
@@ -785,6 +830,7 @@ function seedProducts(db) {
         sellingPricePerPiece: basePrice / ppu * 1.5,
         discount: 0,
         salesCount: Math.floor(Math.random() * 100),
+        status: "In Stock",
         createdAt: timestamp,
         updatedAt: timestamp
       });
@@ -1053,6 +1099,51 @@ class SystemService {
   }
   getStatus() {
     return this.systemRepository.getStatus();
+  }
+}
+class ChangeRequestService {
+  constructor(changeRequestRepository, inventoryService) {
+    this.changeRequestRepository = changeRequestRepository;
+    this.inventoryService = inventoryService;
+  }
+  submit(input) {
+    return this.changeRequestRepository.insert(input);
+  }
+  list(status) {
+    return this.changeRequestRepository.listByStatus(status);
+  }
+  countPending() {
+    return this.changeRequestRepository.countPending();
+  }
+  review(id, input) {
+    const request = this.changeRequestRepository.getById(id);
+    if (!request) throw new Error(`Change request ${id} not found`);
+    if (request.status !== "PENDING") throw new Error(`Change request ${id} is already ${request.status}`);
+    if (input.approved) {
+      const payload = JSON.parse(request.payload);
+      if (request.requestType === "CREATE") {
+        this.inventoryService.create(payload);
+      } else if (request.requestType === "UPDATE") {
+        if (!request.productId) throw new Error("UPDATE request is missing productId");
+        this.inventoryService.update(request.productId, payload);
+      } else if (request.requestType === "DELETE") {
+        const { productId } = payload;
+        this.inventoryService.remove(productId);
+      }
+    }
+    this.changeRequestRepository.markReviewed(id, input);
+  }
+}
+class CustomersService {
+  constructor(customersRepository) {
+    this.customersRepository = customersRepository;
+  }
+  search(query) {
+    if (!query.query || query.query.length < 2) return [];
+    return this.customersRepository.search(query);
+  }
+  save(input) {
+    return this.customersRepository.upsert(input);
   }
 }
 const DEFAULT_PAGE = 1;
@@ -2014,6 +2105,126 @@ class SalesRepository {
     txn();
   }
 }
+function mapRow$1(row) {
+  return {
+    id: row.id,
+    requestType: row.request_type,
+    status: row.status,
+    productId: row.product_id,
+    payload: row.payload,
+    submittedByName: row.submitted_by_name,
+    submittedAt: row.submitted_at,
+    reviewedByName: row.reviewed_by_name,
+    reviewedAt: row.reviewed_at,
+    reviewerNote: row.reviewer_note
+  };
+}
+class ChangeRequestRepository {
+  constructor(db) {
+    this.db = db;
+  }
+  insert(input) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const result = this.db.prepare(`
+      INSERT INTO inventory_change_requests
+        (request_type, status, product_id, payload, submitted_by_name, submitted_at)
+      VALUES
+        (@requestType, 'PENDING', @productId, @payload, @submittedByName, @submittedAt)
+    `).run({
+      requestType: input.requestType,
+      productId: input.productId ?? null,
+      payload: JSON.stringify(input.payload),
+      submittedByName: input.submittedByName ?? null,
+      submittedAt: now
+    });
+    return this.getById(Number(result.lastInsertRowid));
+  }
+  listByStatus(status) {
+    const rows = status ? this.db.prepare(
+      "SELECT * FROM inventory_change_requests WHERE status = ? ORDER BY submitted_at DESC"
+    ).all(status) : this.db.prepare(
+      "SELECT * FROM inventory_change_requests ORDER BY submitted_at DESC"
+    ).all();
+    return rows.map(mapRow$1);
+  }
+  getById(id) {
+    const row = this.db.prepare(
+      "SELECT * FROM inventory_change_requests WHERE id = ?"
+    ).get(id);
+    return row ? mapRow$1(row) : null;
+  }
+  markReviewed(id, input) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    this.db.prepare(`
+      UPDATE inventory_change_requests
+      SET status = @status,
+          reviewed_by_name = @reviewedByName,
+          reviewed_at = @reviewedAt,
+          reviewer_note = @reviewerNote
+      WHERE id = @id
+    `).run({
+      id,
+      status: input.approved ? "APPROVED" : "REJECTED",
+      reviewedByName: input.reviewedByName ?? null,
+      reviewedAt: now,
+      reviewerNote: input.reviewerNote ?? null
+    });
+  }
+  countPending() {
+    const row = this.db.prepare(
+      "SELECT COUNT(*) AS count FROM inventory_change_requests WHERE status = 'PENDING'"
+    ).get();
+    return row.count;
+  }
+}
+function mapRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    idType: row.id_type,
+    idNumber: row.id_number,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+class CustomersRepository {
+  constructor(db) {
+    this.db = db;
+  }
+  search(query) {
+    const searchParam = `%${query.query}%`;
+    let sql = `
+      SELECT * FROM customers 
+      WHERE (name LIKE @search OR id_number LIKE @search)
+    `;
+    const params = { search: searchParam };
+    if (query.idType) {
+      sql += ` AND id_type = @idType`;
+      params.idType = query.idType;
+    }
+    sql += ` ORDER BY name ASC LIMIT 10`;
+    const rows = this.db.prepare(sql).all(params);
+    return rows.map(mapRow);
+  }
+  upsert(input) {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    this.db.prepare(`
+      INSERT INTO customers (name, id_type, id_number, created_at, updated_at)
+      VALUES (@name, @idType, @idNumber, @now, @now)
+      ON CONFLICT(id_number) DO UPDATE SET
+        name = excluded.name,
+        id_type = excluded.id_type,
+        updated_at = excluded.updated_at
+    `).run({
+      name: input.name,
+      idType: input.idType,
+      idNumber: input.idNumber,
+      now
+    });
+    const row = this.db.prepare(`SELECT * FROM customers WHERE id_number = ?`).get(input.idNumber);
+    return mapRow(row);
+  }
+}
 function createAppServices(databaseManager2) {
   const inventoryRepository = new InventoryRepository(databaseManager2.db);
   const usersRepository = new UsersRepository(databaseManager2.db);
@@ -2021,19 +2232,24 @@ function createAppServices(databaseManager2) {
   const ordersRepository = new OrdersRepository(databaseManager2.db);
   const settingsRepository = new SettingsRepository(databaseManager2.db);
   const salesRepository = new SalesRepository(databaseManager2.db);
+  const changeRequestRepository = new ChangeRequestRepository(databaseManager2.db);
+  const customersRepository = new CustomersRepository(databaseManager2.db);
   const systemRepository = new SystemRepository(
     databaseManager2.db,
     databaseManager2.dbPath,
     databaseManager2.backupDir,
     databaseManager2.getAppliedMigrationCount()
   );
+  const inventoryService = new InventoryService(inventoryRepository);
   return {
     systemService: new SystemService(systemRepository),
-    inventoryService: new InventoryService(inventoryRepository),
+    inventoryService,
     posService: new PosService(inventoryRepository, salesRepository),
     ordersService: new OrdersService(ordersRepository),
     adminService: new AdminService(usersRepository, manufacturersRepository),
-    settingsService: new SettingsService(settingsRepository)
+    settingsService: new SettingsService(settingsRepository),
+    changeRequestService: new ChangeRequestService(changeRequestRepository, inventoryService),
+    customersService: new CustomersService(customersRepository)
   };
 }
 function registerHandler(channel, handler) {
@@ -2062,6 +2278,8 @@ function registerIpcHandlers(services) {
   );
   registerHandler("pos:listCatalog", (query) => services.posService.listCatalog(query));
   registerHandler("pos:checkout", (payload) => services.posService.checkout(payload));
+  registerHandler("pos:searchCustomers", (query) => services.customersService.search(query));
+  registerHandler("pos:saveCustomer", (input) => services.customersService.save(input));
   registerHandler("orders:list", (query) => services.ordersService.list(query));
   registerHandler(
     "orders:updateStatus",
@@ -2071,6 +2289,18 @@ function registerIpcHandlers(services) {
   registerHandler("admin:listManufacturers", () => services.adminService.listManufacturers());
   registerHandler("admin:createManufacturer", (payload) => services.adminService.createManufacturer(payload));
   registerHandler("settings:getReceiptSettings", () => services.settingsService.getReceiptSettings());
+  registerHandler(
+    "inventory:submitChangeRequest",
+    (input) => services.changeRequestService.submit(input)
+  );
+  registerHandler(
+    "inventory:listChangeRequests",
+    (status) => services.changeRequestService.list(status)
+  );
+  registerHandler(
+    "inventory:reviewChangeRequest",
+    ({ id, input }) => services.changeRequestService.review(id, input)
+  );
 }
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname$1, "..");

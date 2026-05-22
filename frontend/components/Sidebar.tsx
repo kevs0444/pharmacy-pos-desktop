@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   LayoutDashboard, 
   Package, 
@@ -8,7 +8,8 @@ import {
   UserCircle,
   ShieldCheck,
   Menu,
-  Building2
+  Building2,
+  ClipboardCheck
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -17,13 +18,14 @@ import { cn } from "../lib/utils";
 const settingsNav = [
   { name: "POS Terminal", icon: MonitorPlay },
   { name: "Inventory", icon: Package },
+  { name: "Pending Changes", icon: ClipboardCheck },
   { name: "Orders", icon: ShoppingCart },
   { name: "Manufacturers", icon: Building2 },
   { name: "Dashboard", icon: LayoutDashboard },
   { name: "Admin Panel", icon: ShieldCheck },
 ];
 
-export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel" | "Manufacturers";
+export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel" | "Manufacturers" | "Pending Changes";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -34,6 +36,18 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      window.api.inventory.listChangeRequests('PENDING')
+        .then(r => setPendingCount(r.length))
+        .catch(() => { /* ignore */ });
+    };
+    refresh();
+    const id = setInterval(refresh, 15000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <aside className={cn(
@@ -82,6 +96,10 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
               if (item.name === "Manufacturers" && userRole === "Staff") {
                  return null;
               }
+              // Hide Pending Changes from Staff
+              if (item.name === "Pending Changes" && userRole === "Staff") {
+                 return null;
+              }
 
               const isActive = activeTab === item.name;
               return (
@@ -98,7 +116,14 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
                     title={isCollapsed ? item.name : undefined}
                   >
                     <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-brand-green" : "text-slate-400")} />
-                    {!isCollapsed && <span className="truncate">{item.name}</span>}
+                    {!isCollapsed && (
+                      <span className="truncate flex-1">{item.name}</span>
+                    )}
+                    {!isCollapsed && item.name === "Pending Changes" && pendingCount > 0 && (
+                      <span className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-500 text-white">
+                        {pendingCount}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
