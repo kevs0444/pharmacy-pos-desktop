@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { OrderListQuery, PaginatedResult } from '../types/api'
-import type { OrderStatus, PurchaseOrderRecord } from '../types/domain'
+import type { OrderStatus, PurchaseOrderItemRecord, PurchaseOrderRecord } from '../types/domain'
 import { buildPaginatedResult, escapeLike, normalizePagination } from './helpers'
 
 export class OrdersRepository {
@@ -88,5 +88,22 @@ export class OrdersRepository {
     if (result.changes === 0) {
       throw new Error(`Purchase order with ID ${orderId} not found`)
     }
+  }
+
+  getItems(orderId: number): PurchaseOrderItemRecord[] {
+    return this.db
+      .prepare(
+        `SELECT
+          id,
+          purchase_order_id AS purchaseOrderId,
+          product_name AS productName,
+          quantity_units AS quantityUnits,
+          unit_label AS unitLabel,
+          estimated_cost AS estimatedCost,
+          remarks
+        FROM purchase_order_items
+        WHERE purchase_order_id = @orderId`
+      )
+      .all({ orderId }) as PurchaseOrderItemRecord[]
   }
 }

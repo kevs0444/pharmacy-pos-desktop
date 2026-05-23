@@ -12,6 +12,7 @@ import type {
   ProductCategory,
   ProductRecord,
   ProductSubCategory,
+  PurchaseOrderItemRecord,
   PurchaseOrderRecord,
   ReceiptSettingsRecord,
   UserRecord,
@@ -200,6 +201,7 @@ export interface PharmacyApi {
   }
   orders: {
     list: (query?: OrderListQuery) => Promise<PaginatedResult<PurchaseOrderRecord>>
+    getItems: (orderId: number) => Promise<PurchaseOrderItemRecord[]>
     updateStatus: (orderId: number, status: OrderStatus) => Promise<void>
   }
   admin: {

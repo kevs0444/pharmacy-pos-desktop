@@ -1057,6 +1057,9 @@ class OrdersService {
   list(query) {
     return this.ordersRepository.list(query);
   }
+  getItems(orderId) {
+    return this.ordersRepository.getItems(orderId);
+  }
   updateStatus(orderId, status) {
     this.ordersRepository.updateStatus(orderId, status);
   }
@@ -1879,6 +1882,20 @@ class OrdersRepository {
       throw new Error(`Purchase order with ID ${orderId} not found`);
     }
   }
+  getItems(orderId) {
+    return this.db.prepare(
+      `SELECT
+          id,
+          purchase_order_id AS purchaseOrderId,
+          product_name AS productName,
+          quantity_units AS quantityUnits,
+          unit_label AS unitLabel,
+          estimated_cost AS estimatedCost,
+          remarks
+        FROM purchase_order_items
+        WHERE purchase_order_id = @orderId`
+    ).all({ orderId });
+  }
 }
 class SettingsRepository {
   constructor(db) {
@@ -2281,6 +2298,7 @@ function registerIpcHandlers(services) {
   registerHandler("pos:searchCustomers", (query) => services.customersService.search(query));
   registerHandler("pos:saveCustomer", (input) => services.customersService.save(input));
   registerHandler("orders:list", (query) => services.ordersService.list(query));
+  registerHandler("orders:getItems", (orderId) => services.ordersService.getItems(orderId));
   registerHandler(
     "orders:updateStatus",
     ({ orderId, status }) => services.ordersService.updateStatus(orderId, status)

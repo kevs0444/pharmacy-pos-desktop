@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Sidebar, TabType } from "./components/Sidebar";
-import { Navbar } from "./components/Navbar";
 import { Dashboard } from "./components/Dashboard";
 import { Inventory } from "./components/Inventory";
 import { Sales } from "./components/Sales";
@@ -24,8 +23,7 @@ function App() {
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => setUserRole(null)} userRole={userRole} />
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        <Navbar onLogout={() => setUserRole(null)} onNavigate={setActiveTab} userRole={userRole} />
-        
+        {/* Global Navbar removed in favor of dense spreadsheet headers */}
         {activeTab === "POS Terminal" && <POS />}
         {activeTab === "Dashboard" && <Dashboard userRole={userRole} />}
         {activeTab === "Admin Panel" && <Admin />}

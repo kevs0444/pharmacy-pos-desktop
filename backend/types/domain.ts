@@ -116,6 +116,16 @@ export interface PurchaseOrderRecord {
   updatedAt: string
 }
 
+export interface PurchaseOrderItemRecord {
+  id: number
+  purchaseOrderId: number
+  productName: string
+  quantityUnits: number
+  unitLabel: string | null
+  estimatedCost: number
+  remarks: string | null
+}
+
 export interface ReceiptSettingsRecord {
   id: number
   storeName: string

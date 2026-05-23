@@ -17,7 +17,13 @@ This file gives agentic coding tools project-specific guidance for working in th
 - The app is intended to be offline-first: local workflows should keep working without internet.
 - Sync-oriented architecture is part of the plan: local SQLite first, cloud sync when connectivity is restored.
 - The client is remote, so deployment, updates, and reporting access should remain simple.
-- UX expectations are high: modern, responsive, and easy for pharmacy staff to operate.
+- UX expectations are high: accessibility and simplicity, but apply moderness on top.
+
+## UI & Design Principles
+- **Dense, Spreadsheet-like UI**: Focus on minimizing scrolling and showing critical data directly. Users should be able to edit directly on rows like a spreadsheet.
+- **Dark Dense Headers**: For page headers (like PO REGISTER), use a dark slate background (`bg-slate-700` or similar), white text, and include user info/date inside the header itself rather than a global navbar. This is "fast to recognize".
+- **Solid Colored Buttons**: Use solid block colors for primary actions (e.g., `bg-blue-600` for Reset, `bg-emerald-600` for New, `bg-amber-600` for Post, `bg-red-600` for Delete, `bg-indigo-600` for Receive, `bg-slate-700` for Print).
+- **No Global Navbar**: Redundancy is minimized. Drop generic global navbars in favor of these dedicated, high-density screen headers. Sidebars default to collapsed to maximize horizontal space.
 
 ## AI Project Plan Summary
 - Phase 1 (Completed): High-fidelity UI for login, dashboard, inventory, orders, POS, admin, and responsive layout.

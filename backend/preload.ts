@@ -41,6 +41,7 @@ const api: PharmacyApi = {
   },
   orders: {
     list: (query?: OrderListQuery) => ipcRenderer.invoke('orders:list', query),
+    getItems: (orderId: number) => ipcRenderer.invoke('orders:getItems', orderId),
     updateStatus: (orderId: number, status: OrderStatus) => ipcRenderer.invoke('orders:updateStatus', { orderId, status }),
   },
   admin: {

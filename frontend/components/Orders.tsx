@@ -1,542 +1,391 @@
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/Card";
-import { Clock, CheckCircle, Package, Truck, Search, Building2, AlertCircle, Plus, X, Save, LayoutGrid, List, ChevronLeft, ChevronRight, User, Filter, Calendar, ArrowDownAZ, ArrowUpZA } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { cn } from "../lib/utils";
-import { mapPurchaseOrderRecordToPurchaseOrder } from "../lib/mappers";
+import { OrderDocument } from "./OrderDocument";
+import {
+  Search,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Send,
+  FileText,
+  Package,
+  Printer,
+  User,
+  Mail,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import type { PurchaseOrderRecord, ManufacturerRecord } from "../../backend/types/domain";
 
 // ─────────────────────────────────────────────────────
-// Types & Mock Data
+// Helpers
 // ─────────────────────────────────────────────────────
-type OrderStatus = "Processing" | "In Transit" | "Delivered" | "Cancelled";
-type OrderPriority = "Normal" | "Urgent";
+const RECORDS_PER_PAGE = 20;
 
-interface PurchaseOrder {
-  id: string;
-  manufacturer: string;
-  items: string[];
-  total: number;
-  status: OrderStatus;
-  eta: string;
-  placed: string;
-  priority: OrderPriority;
-  orderedBy: string; // Staff member who placed the order
-  contactPerson: string; // Manufacturer's contact person
-  remarks?: string;
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function formatPeriodLabel(isoMonth: string): string {
+  // "2026-05" → "May 2026"
+  const [y, m] = isoMonth.split("-");
+  const monthIdx = parseInt(m, 10) - 1;
+  return `${MONTH_NAMES[monthIdx] || m} ${y}`;
 }
 
-const MOCK_STAFF = ["Admin", "Jane Reyes", "Mark Santos", "Liza Cruz", "Ben Alvarez"];
-
-
-const PAGE_SIZE = 6;
-
-// Status / Priority config
-const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; icon: any }> = {
-  "Processing":  { label: "Processing",  color: "bg-yellow-100 text-yellow-700 border-yellow-200",   icon: Clock },
-  "In Transit":  { label: "In Transit",  color: "bg-blue-100   text-blue-700   border-blue-200",     icon: Truck },
-  "Delivered":   { label: "Delivered",   color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle },
-  "Cancelled":   { label: "Cancelled",   color: "bg-red-50     text-red-600     border-red-200",     icon: X },
-};
-
-const emptyForm = () => ({
-  manufacturer: "",
-  contactPerson: "",
-  items: "",
-  total: "",
-  priority: "Normal" as OrderPriority,
-  eta: "",
-  orderedBy: "Admin",
-  remarks: "",
-});
+function formatCurrentDateTime(): string {
+  const now = new Date();
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = days[now.getDay()];
+  const dd = now.getDate();
+  const mon = months[now.getMonth()];
+  const yy = String(now.getFullYear()).slice(-2);
+  const h = now.getHours();
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `(${day}) ${dd}-${mon}-${yy} ${h12}:${mm} ${ampm}`;
+}
 
 export function Orders() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [dbManufacturers, setDbManufacturers] = useState<string[]>([]);
+  // ── Data State ──
+  const [orders, setOrders] = useState<PurchaseOrderRecord[]>([]);
+  const [manufacturers, setManufacturers] = useState<ManufacturerRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ── Selection / Navigation ──
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+
+  // ── Filters ──
+  const [searchQuery, setSearchQuery] = useState("");
+  const [gotoPoNumber, setGotoPoNumber] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("All");
+  // dummy state to satisfy the onchange handlers that reset pagination
+  const [, setCurrentPage] = useState(1);
+  const [periodFilter, setPeriodFilter] = useState(() => new Date().toISOString().slice(0, 7));
+
+  // ── Clock ──
+  const [currentTime, setCurrentTime] = useState(formatCurrentDateTime());
   useEffect(() => {
-    async function fetchOrders() {
+    const timer = setInterval(() => setCurrentTime(formatCurrentDateTime()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ── Fetch data ──
+  useEffect(() => {
+    async function fetchData() {
       setIsLoading(true);
       try {
-        const result = await window.api.orders.list({ page: 1, pageSize: 500 });
-        const mappedOrders: PurchaseOrder[] = result.items.map(mapPurchaseOrderRecordToPurchaseOrder);
-        setOrders(mappedOrders);
-        const mfgResult = await window.api.admin.listManufacturers();
-        setDbManufacturers(mfgResult.map((m: any) => m.name));
+        const [orderResult, mfgResult] = await Promise.all([
+          window.api.orders.list({ page: 1, pageSize: 1000 }),
+          window.api.admin.listManufacturers(),
+        ]);
+        setOrders(orderResult.items);
+        setManufacturers(mfgResult);
+        if (orderResult.items.length > 0) {
+          setSelectedOrderId(orderResult.items[0].id);
+        }
       } catch (e: any) {
-        window.dispatchEvent(new CustomEvent('app-error', {
-          detail: { title: "Orders Fetch Error", message: e.message || String(e) }
-        }));
+        window.dispatchEvent(
+          new CustomEvent("app-error", {
+            detail: { title: "Orders Fetch Error", message: e.message || String(e) },
+          })
+        );
         console.error("Failed to load Orders:", e);
       } finally {
         setIsLoading(false);
       }
     }
-    fetchOrders();
+    fetchData();
   }, []);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm());
 
-  // View & Filters
-  const [viewMode, setViewMode] = useState<"list" | "card">("list");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterManufacturer, setFilterManufacturer] = useState("All");
-  const [filterStatus, setFilterStatus] = useState<OrderStatus | "All">("All");
-  const [filterPriority, setFilterPriority] = useState<OrderPriority | "All">("All");
-  const [filterOrderedBy, setFilterOrderedBy] = useState("All");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // newest first
-  const [currentPage, setCurrentPage] = useState(1);
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-
-  const inTransit  = orders.filter(o => o.status === "In Transit").length;
-  const processing = orders.filter(o => o.status === "Processing").length;
-  const delivered  = orders.filter(o => o.status === "Delivered").length;
-
-  const handleSave = () => {
-    if (!form.manufacturer || !form.items) return;
-    const newOrder: PurchaseOrder = {
-      id: `PO-2026-${String(orders.length + 49).padStart(4, "0")}`,
-      manufacturer: form.manufacturer,
-      contactPerson: form.contactPerson,
-      items: form.items.split(",").map(s => s.trim()),
-      total: parseFloat(form.total) || 0,
-      status: "Processing",
-      eta: form.eta || "TBD",
-      placed: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      priority: form.priority,
-      orderedBy: form.orderedBy,
-      remarks: form.remarks
-    };
-    setOrders(prev => [newOrder, ...prev]);
-    setIsModalOpen(false);
-    setForm(emptyForm());
-  };
-
-  // Memoized filter + sort
+  // ── Filtered + sorted orders ──
   const filteredOrders = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return [...orders.filter(o => {
-      const matchesSearch = !q || o.id.toLowerCase().includes(q) || o.manufacturer.toLowerCase().includes(q) || o.items.some(i => i.toLowerCase().includes(q));
-      const matchesMfg = filterManufacturer === "All" || o.manufacturer === filterManufacturer;
-      const matchesStatus = filterStatus === "All" || o.status === filterStatus;
-      const matchesPriority = filterPriority === "All" || o.priority === filterPriority;
-      const matchesPerson = filterOrderedBy === "All" || o.orderedBy === filterOrderedBy;
-      return matchesSearch && matchesMfg && matchesStatus && matchesPriority && matchesPerson;
-    })].sort((a, b) => sortOrder === "asc" ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id));
-  }, [orders, searchQuery, filterManufacturer, filterStatus, filterPriority, filterOrderedBy, sortOrder]);
+    const q = searchQuery.toLowerCase().trim();
+    return orders.filter((o) => {
+      if (q && !o.orderCode.toLowerCase().includes(q) && !o.manufacturerName.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (filterStatus !== "All" && o.status !== filterStatus) return false;
+      if (periodFilter && o.placedDate && !o.placedDate.startsWith(periodFilter)) return false;
+      return true;
+    });
+  }, [orders, searchQuery, filterStatus, periodFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
-  const pagedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // ── Navigate current record ──
+  const selectedOrder = useMemo(
+    () => orders.find((o) => o.id === selectedOrderId) || null,
+    [orders, selectedOrderId]
+  );
 
-  const getPageNumbers = (current: number, total: number) => {
-    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
-    if (current <= 3) return [1, 2, 3, 4, '...', total];
-    if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
-    return [1, '...', current - 1, current, current + 1, '...', total];
+  const currentRecordIdx = useMemo(() => {
+    if (!selectedOrderId) return -1;
+    return filteredOrders.findIndex((o) => o.id === selectedOrderId);
+  }, [filteredOrders, selectedOrderId]);
+
+  const navigateRecord = useCallback(
+    (direction: "first" | "prev" | "next" | "last") => {
+      if (filteredOrders.length === 0) return;
+      let idx = currentRecordIdx;
+      switch (direction) {
+        case "first": idx = 0; break;
+        case "prev": idx = Math.max(0, idx - 1); break;
+        case "next": idx = Math.min(filteredOrders.length - 1, idx + 1); break;
+        case "last": idx = filteredOrders.length - 1; break;
+      }
+      setSelectedOrderId(filteredOrders[idx].id);
+      const page = Math.floor(idx / RECORDS_PER_PAGE) + 1;
+      setCurrentPage(page);
+    },
+    [filteredOrders, currentRecordIdx]
+  );
+
+  // ── Goto PO ──
+  const handleGotoPo = useCallback(() => {
+    if (!gotoPoNumber.trim()) return;
+    const target = orders.find((o) => o.orderCode.toLowerCase().includes(gotoPoNumber.toLowerCase().trim()));
+    if (target) {
+      setSelectedOrderId(target.id);
+      setSearchQuery("");
+      setFilterStatus("All");
+      setGotoPoNumber("");
+    }
+  }, [gotoPoNumber, orders]);
+
+  // ── Reset filters ──
+  const handleReset = () => {
+    setSearchQuery("");
+    setFilterStatus("All");
+    setPeriodFilter(new Date().toISOString().slice(0, 7));
+    setCurrentPage(1);
+    setGotoPoNumber("");
   };
 
-  const uniqueManufacturers = [...new Set(orders.map(o => o.manufacturer))];
-  const uniqueStaff = [...new Set(orders.map(o => o.orderedBy))];
+  const mfgForDocument = useMemo(
+    () =>
+      manufacturers.map((m) => ({
+        id: m.id,
+        name: m.name,
+        contactPerson: m.contactPerson,
+        email: m.email,
+        phone: m.phone,
+      })),
+    [manufacturers]
+  );
 
-  const resetPage = () => setCurrentPage(1);
-
-  const selectClass = "px-3 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:border-brand-blue/40 focus:outline-none focus:ring-2 focus:ring-brand-blue/30 transition-all";
+  // Dark button style helper
+  const btnCls = "flex items-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95";
 
   return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8 space-y-6 bg-slate-50 overflow-y-auto custom-scrollbar relative">
-
-      {/* ── New Order Modal ── */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="bg-brand-blue p-6 flex justify-between items-center text-white shrink-0">
-              <div>
-                <h2 className="text-xl font-bold">New Purchase Order</h2>
-                <p className="text-sm opacity-80 mt-1">Place a supply order to a manufacturer or supplier.</p>
-              </div>
-              <button onClick={() => { setIsModalOpen(false); setForm(emptyForm()); }} className="p-2 hover:bg-white/20 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6 md:p-8 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Manufacturer / Supplier *</label>
-                  <select value={form.manufacturer} onChange={e => setForm({...form, manufacturer: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all">
-                    <option value="">Select manufacturer...</option>
-                    {dbManufacturers.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Person (at Manufacturer)</label>
-                  <input type="text" value={form.contactPerson} onChange={e => setForm({...form, contactPerson: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="e.g. Mr. Garcia" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ordered By (Staff) *</label>
-                  <select value={form.orderedBy} onChange={e => setForm({...form, orderedBy: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all">
-                    {MOCK_STAFF.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Priority</label>
-                  <div className="flex gap-3">
-                    {(["Normal", "Urgent"] as OrderPriority[]).map(p => (
-                      <button key={p} type="button" onClick={() => setForm({...form, priority: p})}
-                        className={cn("flex-1 py-3 rounded-xl font-bold text-sm border-2 transition-all",
-                          form.priority === p ? (p === "Urgent" ? "bg-red-500 text-white border-red-500" : "bg-brand-blue text-white border-brand-blue") : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
-                        )}>
-                        {p === "Urgent" ? "🚨 Urgent" : "✅ Normal"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Items Ordered (comma separated) *</label>
-                <input type="text" value={form.items} onChange={e => setForm({...form, items: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="e.g. Biogesic 500mg (10 boxes), Neozep (5 boxes)" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Amount (₱)</label>
-                  <input type="number" value={form.total} onChange={e => setForm({...form, total: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400" placeholder="0.00" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expected ETA</label>
-                  <input type="date" value={form.eta} onChange={e => setForm({...form, eta: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all text-slate-700 font-medium" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks (Optional)</label>
-                <textarea value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} rows={2} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none transition-all placeholder:text-slate-400 resize-none text-sm font-medium" placeholder="Additional notes about this order..." />
-              </div>
-            </div>
-            <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100 shrink-0">
-              <button onClick={() => { setIsModalOpen(false); setForm(emptyForm()); }} className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
-              <button onClick={handleSave} className="px-8 py-3 bg-brand-green hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-brand-green/20 transition-all flex items-center gap-2 active:scale-95">
-                <Save className="w-5 h-5" /> Place Order
-              </button>
-            </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-100">
+      {/* ═══════════════ TOP TOOLBAR ═══════════════ */}
+      <div className="bg-white border-b border-slate-300 shrink-0">
+        {/* Row 1: Title bar with user info */}
+        <div className="flex items-center justify-between px-4 py-1.5 bg-slate-700 text-white">
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-slate-300" />
+            <span className="text-xs font-bold">PO REGISTER</span>
+            <span className="text-[10px] text-slate-400 ml-1">
+              — {selectedOrder?.manufacturerName || "Purchase Orders"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 text-[10px] font-medium text-slate-300">
+              <User className="w-3 h-3" />
+              User ID: <span className="font-bold text-white">CHA</span>
+            </span>
+            <span className="text-[10px] font-medium text-slate-300">
+              {currentTime}
+            </span>
           </div>
         </div>
-      )}
 
-      <div className="max-w-7xl mx-auto space-y-6 animate-in slide-in-from-bottom-2 fade-in duration-500">
-
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
-              Purchase Orders
-              {isLoading && <span className="text-xs font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-md animate-pulse">Loading...</span>}
-            </h1>
-            <p className="text-sm font-medium text-slate-500 mt-1">Track supply orders from manufacturers and suppliers.</p>
-          </div>
-          <button onClick={() => setIsModalOpen(true)} className="bg-brand-blue hover:bg-blue-900 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-xl font-bold shadow-lg shadow-brand-blue/20 transition-all flex items-center gap-2 active:scale-95 self-start sm:self-auto text-sm">
-            <Plus className="w-4 h-4" /> New Order
-          </button>
-        </div>
-
-        {/* ── Status Summary Cards (Interactive Widgets) ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-          {[
-            { label: "Processing",  count: processing, icon: Clock,         color: "bg-yellow-50 border-yellow-200 text-yellow-800", iconBg: "bg-yellow-100 text-yellow-700", ringColor: "ring-yellow-400" },
-            { label: "In Transit",  count: inTransit,  icon: Truck,         color: "bg-blue-50   border-blue-200   text-blue-800",   iconBg: "bg-blue-100 text-blue-700", ringColor: "ring-blue-400" },
-            { label: "Delivered",   count: delivered,  icon: CheckCircle,   color: "bg-emerald-50 border-emerald-200 text-emerald-800", iconBg: "bg-emerald-100 text-emerald-700", ringColor: "ring-emerald-400" },
-            { label: "Total Orders",count: orders.length,icon: Package,     color: "bg-slate-50  border-slate-200  text-slate-800",  iconBg: "bg-slate-100 text-slate-600", ringColor: "ring-slate-300" },
-          ].map(({ label, count, icon: Icon, color, iconBg, ringColor }) => {
-            const isActive = label === "Total Orders" ? filterStatus === "All" : filterStatus === label;
-            return (
-              <Card 
-                key={label} 
+        {/* Row 2: Filters + Actions */}
+        <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
+          {/* Period with month name */}
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Period</label>
+            <div className="flex items-center rounded border border-slate-300 shadow-sm bg-white overflow-hidden">
+              <button 
                 onClick={() => {
-                  setFilterStatus(label === "Total Orders" ? "All" : label as OrderStatus);
-                  resetPage();
+                  const d = new Date(periodFilter + "-01");
+                  d.setMonth(d.getMonth() - 1);
+                  setPeriodFilter(d.toISOString().slice(0, 7));
+                  setCurrentPage(1);
                 }}
-                className={cn(
-                  "rounded-[1rem] shadow-sm border cursor-pointer transition-all duration-200", 
-                  color,
-                  isActive ? `ring-2 ring-offset-2 ${ringColor} scale-[1.02]` : "opacity-70 hover:opacity-100 hover:-translate-y-1 hover:shadow-md"
-                )}>
-                <CardContent className="p-4 md:p-5 flex items-center gap-3">
-                  <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", iconBg)}><Icon className="w-4 h-4" /></div>
-                  <div>
-                    <h3 className="text-xl md:text-2xl font-black">{count}</h3>
-                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">{label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                className="px-1.5 py-1 hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors border-r border-slate-300"
+              ><ChevronLeft className="w-3.5 h-3.5"/></button>
+              <button 
+                onClick={() => {
+                  const d = new Date(periodFilter + "-01");
+                  d.setMonth(d.getMonth() + 1);
+                  setPeriodFilter(d.toISOString().slice(0, 7));
+                  setCurrentPage(1);
+                }}
+                className="px-1.5 py-1 hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors"
+              ><ChevronRight className="w-3.5 h-3.5"/></button>
+            </div>
+            <input
+              type="month"
+              value={periodFilter}
+              onChange={(e) => {
+                setPeriodFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 text-xs font-medium border border-slate-300 rounded bg-white text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none transition-all w-[130px] shadow-sm h-[26px]"
+            />
+            <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap shadow-sm h-[26px] flex items-center">
+              {formatPeriodLabel(periodFilter)}
+            </span>
+          </div>
+
+          <div className="w-px h-6 bg-slate-300" />
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="Search PO / supplier..."
+              className="pl-7 pr-3 py-1.5 text-xs font-medium border border-slate-300 rounded bg-white text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none transition-all w-[170px]"
+            />
+          </div>
+
+          {/* Goto PO */}
+          <div className="flex items-center gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap">Goto PO#</label>
+            <input
+              type="text"
+              value={gotoPoNumber}
+              onChange={(e) => setGotoPoNumber(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleGotoPo()}
+              placeholder="PO-2026-..."
+              className="px-2 py-1.5 text-xs font-medium border border-slate-300 rounded bg-white text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none transition-all w-[110px]"
+            />
+          </div>
+
+          <div className="w-px h-6 bg-slate-300" />
+
+          {/* Action Buttons — VIBRANT colors matching user request */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={handleReset} className={cn(btnCls, "bg-[#1d4ed8] hover:bg-[#1e40af]")}>
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />Reset
+            </button>
+            <button className={cn(btnCls, "bg-[#047857] hover:bg-[#065f46]")}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />New
+            </button>
+            <button className={cn(btnCls, "bg-[#ea580c] hover:bg-[#c2410c]")}>
+              <Send className="w-3.5 h-3.5 mr-1.5" />Post
+            </button>
+            <button className={cn(btnCls, "bg-[#b91c1c] hover:bg-[#991b1b]")}>
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete
+            </button>
+            <button className={cn(btnCls, "bg-[#4f46e5] hover:bg-[#4338ca]")}>
+              <Package className="w-3.5 h-3.5 mr-1.5" />Receive
+            </button>
+            <button className={cn(btnCls, "bg-[#334155] hover:bg-[#1e293b]")}>
+              <Printer className="w-3.5 h-3.5 mr-1.5" />Print
+            </button>
+            <button className={cn(btnCls, "bg-[#9333ea] hover:bg-[#7e22ce]")}>
+              <Mail className="w-3.5 h-3.5 mr-1.5" />Email
+            </button>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Procedures */}
+          <div className="flex items-center gap-1">
+             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap">Procedures</label>
+             <select className="px-2 py-1.5 text-xs font-medium border border-slate-300 rounded bg-white text-slate-700 outline-none w-[150px]">
+                <option value=""></option>
+             </select>
+          </div>
+
+
+
+          {isLoading && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded animate-pulse">
+              Loading...
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════════ MAIN CONTENT: Document View ═══════════════ */}
+      <div className="flex-1 overflow-hidden">
+        <OrderDocument
+          order={selectedOrder}
+          manufacturers={mfgForDocument}
+          isNew={false}
+          onNavigate={navigateRecord}
+        />
+      </div>
+
+      {/* ═══════════════ BOTTOM NAVIGATION BAR ═══════════════ */}
+      <div className="bg-slate-200 border-t-2 border-slate-300 shrink-0 flex flex-col">
+        {/* Row 1/2: Stock Summary */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-slate-300/50">
+          <div className="flex flex-col">
+            <button className="text-[10px] font-bold text-red-600 bg-white border border-red-200 rounded px-2 py-0.5 w-fit hover:bg-red-50">
+              Delete Stock
+            </button>
+            <span className="text-[10px] font-bold text-red-500 mt-1">
+              Current item has enough qty in stock.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-6 text-center">
+            {[
+              { label: "InStock", value: "3", textCls: "text-blue-800" },
+              { label: "Suggest", value: "-228", textCls: "text-blue-800" },
+              { label: "AvgWeek", value: ".2", textCls: "text-blue-800" },
+              { label: "AvgMnth", value: "6.7", textCls: "text-blue-800" },
+              { label: "CurrMonth", value: "1", textCls: "text-blue-800" },
+              { label: "MonthHigh", value: "17", textCls: "text-blue-800" },
+            ].map(({ label, value, textCls }) => (
+              <div key={label}>
+                <p className="text-[10px] font-black text-blue-900">{label}</p>
+                <p className={cn("text-[11px] font-black bg-white/50 px-1 rounded", textCls)}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-6 text-center">
+            <div>
+              <p className="text-[10px] font-black text-blue-900">Purc Cost</p>
+              <p className="text-[11px] font-black text-blue-800 bg-white/50 px-1 rounded">
+                {selectedOrder?.total ? selectedOrder.total.toFixed(3) : "24.000"}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-blue-900">SellPrice</p>
+              <p className="text-[11px] font-black text-blue-800 bg-white/50 px-1 rounded">0.00</p>
+            </div>
+          </div>
         </div>
 
-        {/* ── Order Filters (Extracted) ── */}
-        <Card className="rounded-[1rem] shadow-sm border border-slate-200 bg-white">
-          <CardContent className="p-4 md:p-5">
-            <div className="flex flex-col gap-4">
-              {/* Search & Action Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="relative flex-1 sm:max-w-md">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
-                    placeholder="Search PO, manufacturer..." className="w-full pl-9 pr-4 py-2 flex-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue/50 text-sm font-medium transition-all" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setSortOrder(p => p === "asc" ? "desc" : "asc"); resetPage(); }}
-                    className="p-2 rounded-lg bg-slate-50 border border-slate-200 hover:border-brand-blue/30 text-slate-500 hover:text-brand-blue transition-all" title="Toggle Sort">
-                    {sortOrder === "desc" ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
-                  </button>
-                  <div className="flex bg-slate-50 p-1 rounded-lg border border-slate-200 shrink-0">
-                    <button onClick={() => { setViewMode("list"); resetPage(); }} className={cn("p-1.5 rounded-md transition-all", viewMode === "list" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")} title="List View"><List className="w-4 h-4" /></button>
-                    <button onClick={() => { setViewMode("card"); resetPage(); }} className={cn("p-1.5 rounded-md transition-all", viewMode === "card" ? "bg-white shadow-sm text-brand-blue" : "text-slate-400 hover:text-slate-600")} title="Card View"><LayoutGrid className="w-4 h-4" /></button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dropdown Filters Row */}
-              <div className="flex flex-wrap items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:inline-block">Filter by:</span>
-
-                <select value={filterManufacturer} onChange={e => { setFilterManufacturer(e.target.value); resetPage(); }} className={selectClass}>
-                  <option value="All">🏭 All Manufacturers</option>
-                  {uniqueManufacturers.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-
-                <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value as any); resetPage(); }} className={selectClass}>
-                  <option value="All">📦 All Statuses</option>
-                  {(["Processing", "In Transit", "Delivered", "Cancelled"] as OrderStatus[]).map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-
-                <select value={filterPriority} onChange={e => { setFilterPriority(e.target.value as any); resetPage(); }} className={selectClass}>
-                  <option value="All">⚡ All Priorities</option>
-                  <option value="Normal">Normal</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-
-                <select value={filterOrderedBy} onChange={e => { setFilterOrderedBy(e.target.value); resetPage(); }} className={selectClass}>
-                  <option value="All">👤 All Staff</option>
-                  {uniqueStaff.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-
-                {/* Reset filters */}
-                {(filterManufacturer !== "All" || filterStatus !== "All" || filterPriority !== "All" || filterOrderedBy !== "All" || searchQuery) && (
-                  <button onClick={() => { setFilterManufacturer("All"); setFilterStatus("All"); setFilterPriority("All"); setFilterOrderedBy("All"); setSearchQuery(""); resetPage(); }}
-                    className="text-[10px] sm:ml-auto font-black text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg uppercase tracking-wider flex items-center gap-1.5 transition-colors">
-                    <X className="w-3 h-3" /> Clear
-                  </button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Orders Table/Card Area ── */}
-        <Card className="border-t-4 border-t-brand-blue overflow-hidden rounded-[1rem] shadow-sm bg-white">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-3 bg-slate-50/50 border-b border-slate-100">
-             <CardTitle className="text-lg md:text-xl font-bold text-slate-800">
-               Supplier Order Queue
-               <span className="ml-2 text-sm font-normal text-slate-400">({filteredOrders.length} orders)</span>
-             </CardTitle>
-          </CardHeader>
-
-          <CardContent className="p-4 md:p-5 bg-slate-50/30 min-h-[300px]">
-            {pagedOrders.length === 0 ? (
-              <div className="h-40 flex flex-col items-center justify-center text-slate-400">
-                <Package className="w-10 h-10 opacity-20 mb-3" />
-                <p className="font-bold text-sm">No orders found.</p>
-              </div>
-            ) : viewMode === "list" ? (
-              /* ─── List / Table View ─── */
-              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">Order ID</th>
-                      <th className="px-4 py-3">Manufacturer</th>
-                      <th className="px-4 py-3">Items</th>
-                      <th className="px-4 py-3">Ordered By</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">ETA</th>
-                      <th className="px-4 py-3 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {pagedOrders.map((order) => {
-                      const cfg = STATUS_CONFIG[order.status];
-                      const isExpanded = expandedOrderId === order.id;
-
-                      return (
-                        <>
-                          <tr key={order.id} 
-                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                            className={cn(
-                              "hover:bg-slate-50/80 transition-colors group cursor-pointer",
-                              isExpanded && "bg-brand-blue/3"
-                            )}>
-                            <td className="px-4 py-3">
-                              <span className="font-mono font-bold text-brand-blue text-xs group-hover:underline">{order.id}</span>
-                              {order.priority === "Urgent" && <span className="ml-1.5 text-[8px] font-black uppercase bg-red-100 text-red-600 px-1.5 py-0.5 rounded border border-red-200">Urgent</span>}
-                            </td>
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-700 text-xs">{order.manufacturer}</p>
-                              <p className="text-[10px] text-slate-400">{order.contactPerson || "—"}</p>
-                            </td>
-                            <td className="px-4 py-3">
-                              <p className="text-xs text-slate-600 font-medium">{order.items.length} item{order.items.length > 1 ? "s" : ""}</p>
-                              <p className="text-[10px] text-slate-400 truncate max-w-[160px]">{order.items[0]}{order.items.length > 1 ? ` +${order.items.length - 1} more` : ""}</p>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-                                <User className="w-3 h-3 text-slate-400" />{order.orderedBy}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={cn("text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md border", cfg.color)}>{cfg.label}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="flex items-center gap-1 text-xs text-slate-500 font-medium"><Calendar className="w-3 h-3 text-slate-300" />{order.eta}</span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="font-black text-slate-800 text-sm">₱{order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </td>
-                          </tr>
-
-                          {/* Expandable Detail Row */}
-                          {isExpanded && (
-                            <tr key={`detail-${order.id}`} className="bg-slate-50/70">
-                              <td colSpan={7} className="px-6 py-5">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                  {/* Order Info */}
-                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Order Info</h4>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between"><span className="text-slate-400">Manufacturer</span><span className="font-bold text-slate-600">{order.manufacturer}</span></div>
-                                      <div className="flex justify-between"><span className="text-slate-400">Contact</span><span className="font-bold text-slate-600">{order.contactPerson || "—"}</span></div>
-                                      <div className="flex justify-between"><span className="text-slate-400">Ordered By</span><span className="font-bold text-slate-600">{order.orderedBy}</span></div>
-                                      <div className="flex justify-between"><span className="text-slate-400">Priority</span><span className={cn("font-bold", order.priority === "Urgent" ? "text-red-500" : "text-slate-600")}>{order.priority}</span></div>
-                                      {order.remarks && (
-                                        <div className="flex flex-col gap-1 border-t border-slate-100 pt-2"><span className="text-slate-400">Remarks</span><span className="font-medium text-slate-600 italic text-xs leading-tight">{order.remarks}</span></div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Financials & Timeline */}
-                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Financials & Timeline</h4>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between"><span className="text-slate-400">Order Total</span><span className="font-black text-brand-blue text-base">₱{order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                                      <div className="flex justify-between"><span className="text-slate-400">Items Count</span><span className="font-bold text-slate-600">{order.items.length} items</span></div>
-                                      <div className="flex justify-between border-t border-slate-100 pt-2"><span className="text-slate-400">Placed On</span><span className="font-bold text-slate-600">{order.placed}</span></div>
-                                      <div className="flex justify-between"><span className="text-slate-400">Expected ETA</span><span className="font-bold text-slate-600">{order.eta}</span></div>
-                                    </div>
-                                  </div>
-
-                                  {/* Items Breakdown */}
-                                  <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2">Items Breakdown</h4>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                                      {order.items.map((item, idx) => (
-                                        <div key={idx} className="flex flex-col bg-slate-50 rounded-lg border border-slate-100 p-2">
-                                          <span className="font-bold text-slate-700 text-xs">{item}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              /* ─── Card View ─── */
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {pagedOrders.map((order, i) => {
-                  const cfg = STATUS_CONFIG[order.status];
-                  const StatusIcon = cfg.icon;
-                  return (
-                    <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col gap-3">
-                      {/* Card Header */}
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <span className="font-mono font-bold text-brand-blue text-sm">{order.id}</span>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1", cfg.color)}>
-                              <StatusIcon className="w-3 h-3" />{cfg.label}
-                            </span>
-                            {order.priority === "Urgent" && (
-                              <span className="text-[9px] font-black uppercase bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />Urgent
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-black text-slate-800">₱{order.total.toLocaleString()}</p>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Order Total</p>
-                        </div>
-                      </div>
-
-                      {/* Manufacturer & Person */}
-                      <div className="flex items-center gap-4 text-xs text-slate-600 font-semibold">
-                        <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-slate-400" />{order.manufacturer}</span>
-                        <span className="text-slate-200">|</span>
-                        <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-slate-400" />{order.orderedBy}</span>
-                      </div>
-
-                      {/* Items */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {order.items.slice(0, 2).map((item, j) => (
-                          <span key={j} className="bg-slate-100 text-[10px] font-semibold text-slate-600 px-2 py-1 rounded-md">{item}</span>
-                        ))}
-                        {order.items.length > 2 && <span className="bg-slate-100 text-[10px] font-bold text-slate-400 px-2 py-1 rounded-md">+{order.items.length - 2} more</span>}
-                      </div>
-
-                      {/* Remarks */}
-                      {order.remarks && <p className="text-[10px] text-slate-400 italic border-l-2 border-slate-200 pl-2 line-clamp-2">{order.remarks}</p>}
-
-                      {/* Footer Dates */}
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-2 border-t border-slate-100">
-                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />Placed: {order.placed}</span>
-                        <span className="flex items-center gap-1"><Truck className="w-3 h-3" />ETA: {order.eta}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── Pagination ── */}
-            {totalPages > 1 && (
-              <div className="mt-5 flex items-center justify-between">
-                <p className="text-xs text-slate-400 font-medium">Page {currentPage} of {totalPages}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
-                    <ChevronLeft className="w-4 h-4 text-slate-600" />
-                  </button>
-                  {getPageNumbers(currentPage, totalPages).map((page, i) => (
-                    page === '...' ? (
-                       <span key={`dots-${i}`} className="px-2 py-1 text-slate-400 font-bold">...</span>
-                    ) : (
-                       <button key={`page-${page}`} onClick={() => setCurrentPage(page as number)}
-                         className={cn("w-8 h-8 rounded-lg text-xs font-bold border transition-all",
-                           currentPage === page ? "bg-brand-blue text-white border-brand-blue shadow-sm" : "bg-white border-slate-200 text-slate-600 hover:border-brand-blue/40"
-                         )}>
-                         {page}
-                       </button>
-                    )
-                  ))}
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
-                    <ChevronRight className="w-4 h-4 text-slate-600" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Row 3: Record Navigator */}
+        <div className="flex items-center px-4 py-1.5 bg-slate-100 text-[10px] font-bold text-slate-600 gap-2">
+          <span>Record:</span>
+          <div className="flex items-center">
+            <button onClick={() => navigateRecord("first")} className="px-1 hover:text-blue-600">|◄</button>
+            <button onClick={() => navigateRecord("prev")} className="px-1 hover:text-blue-600">◄</button>
+            <input 
+              type="text" 
+              value={currentRecordIdx >= 0 ? currentRecordIdx + 1 : ""} 
+              readOnly 
+              className="w-8 text-center mx-1 border border-slate-300 text-[10px] py-0.5"
+            />
+            <button onClick={() => navigateRecord("next")} className="px-1 hover:text-blue-600">►</button>
+            <button onClick={() => navigateRecord("last")} className="px-1 hover:text-blue-600">►|</button>
+          </div>
+          <span>of {filteredOrders.length}</span>
+          <div className="flex-1 ml-4 border-t border-slate-400 mt-1"></div>
+        </div>
       </div>
     </div>
   );

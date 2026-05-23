@@ -42,6 +42,7 @@ export function registerIpcHandlers(services: AppServices): void {
   registerHandler<CustomerSearchQuery>('pos:searchCustomers', (query) => services.customersService.search(query))
   registerHandler<CustomerSaveInput>('pos:saveCustomer', (input) => services.customersService.save(input))
   registerHandler<OrderListQuery | undefined>('orders:list', (query) => services.ordersService.list(query))
+  registerHandler<number>('orders:getItems', (orderId) => services.ordersService.getItems(orderId))
   registerHandler<{ orderId: number; status: OrderStatus }>('orders:updateStatus', ({ orderId, status }) =>
     services.ordersService.updateStatus(orderId, status),
   )

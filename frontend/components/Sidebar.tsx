@@ -35,7 +35,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
