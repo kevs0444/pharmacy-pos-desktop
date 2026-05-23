@@ -46,6 +46,7 @@ export function registerIpcHandlers(services: AppServices): void {
   registerHandler<{ orderId: number; status: OrderStatus }>('orders:updateStatus', ({ orderId, status }) =>
     services.ordersService.updateStatus(orderId, status),
   )
+  registerHandler<any>('orders:save', (payload) => services.ordersService.save(payload))
   registerHandler<AdminUserListQuery | undefined>('admin:listUsers', (query) => services.adminService.listUsers(query))
   registerHandler('admin:listManufacturers', () => services.adminService.listManufacturers())
   registerHandler<any>('admin:createManufacturer', (payload) => services.adminService.createManufacturer(payload))

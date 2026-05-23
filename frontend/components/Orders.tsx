@@ -1,6 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { cn } from "../lib/utils";
+import type { OrderDocumentRef } from "./OrderDocument";
 import { OrderDocument } from "./OrderDocument";
+import { PageHeader } from "./ui/PageHeader";
+import { ActionToolbar, ActionButton } from "./ui/ActionToolbar";
 import {
   Search,
   Plus,
@@ -66,6 +69,8 @@ export function Orders() {
   const [, setCurrentPage] = useState(1);
   const [periodFilter, setPeriodFilter] = useState(() => new Date().toISOString().slice(0, 7));
 
+  const docRef = useRef<OrderDocumentRef>(null);
+
   // ── Clock ──
   const [currentTime, setCurrentTime] = useState(formatCurrentDateTime());
   useEffect(() => {
@@ -74,31 +79,32 @@ export function Orders() {
   }, []);
 
   // ── Fetch data ──
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      try {
-        const [orderResult, mfgResult] = await Promise.all([
-          window.api.orders.list({ page: 1, pageSize: 1000 }),
-          window.api.admin.listManufacturers(),
-        ]);
-        setOrders(orderResult.items);
-        setManufacturers(mfgResult);
-        if (orderResult.items.length > 0) {
-          setSelectedOrderId(orderResult.items[0].id);
-        }
-      } catch (e: any) {
-        window.dispatchEvent(
-          new CustomEvent("app-error", {
-            detail: { title: "Orders Fetch Error", message: e.message || String(e) },
-          })
-        );
-        console.error("Failed to load Orders:", e);
-      } finally {
-        setIsLoading(false);
+  async function loadOrders() {
+    setIsLoading(true);
+    try {
+      const [orderResult, mfgResult] = await Promise.all([
+        window.api.orders.list({ page: 1, pageSize: 1000 }),
+        window.api.admin.listManufacturers(),
+      ]);
+      setOrders(orderResult.items);
+      setManufacturers(mfgResult);
+      if (orderResult.items.length > 0 && selectedOrderId === null) {
+        setSelectedOrderId(orderResult.items[0].id);
       }
+    } catch (e: any) {
+      window.dispatchEvent(
+        new CustomEvent("app-error", {
+          detail: { title: "Orders Fetch Error", message: e.message || String(e) },
+        })
+      );
+      console.error("Failed to load Orders:", e);
+    } finally {
+      setIsLoading(false);
     }
-    fetchData();
+  }
+
+  useEffect(() => {
+    loadOrders();
   }, []);
 
   // ── Filtered + sorted orders ──
@@ -154,6 +160,12 @@ export function Orders() {
     }
   }, [gotoPoNumber, orders]);
 
+  const handlePost = () => {
+    if (docRef.current) {
+      docRef.current.save();
+    }
+  };
+
   // ── Reset filters ──
   const handleReset = () => {
     setSearchQuery("");
@@ -175,35 +187,21 @@ export function Orders() {
     [manufacturers]
   );
 
-  // Dark button style helper
-  const btnCls = "flex items-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95";
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-100">
       {/* ═══════════════ TOP TOOLBAR ═══════════════ */}
+      {/* ═══════════════ TOP TOOLBAR ═══════════════ */}
       <div className="bg-white border-b border-slate-300 shrink-0">
-        {/* Row 1: Title bar with user info */}
-        <div className="flex items-center justify-between px-4 py-1.5 bg-slate-700 text-white">
-          <div className="flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5 text-slate-300" />
-            <span className="text-xs font-bold">PO REGISTER</span>
-            <span className="text-[10px] text-slate-400 ml-1">
-              — {selectedOrder?.manufacturerName || "Purchase Orders"}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-[10px] font-medium text-slate-300">
-              <User className="w-3 h-3" />
-              User ID: <span className="font-bold text-white">CHA</span>
-            </span>
-            <span className="text-[10px] font-medium text-slate-300">
-              {currentTime}
-            </span>
-          </div>
-        </div>
+        <PageHeader userId="CHA" dateStr={currentTime}>
+          <FileText className="w-4 h-4 text-slate-300" />
+          <span className="text-xs font-bold tracking-widest uppercase">PO REGISTER</span>
+          <span className="text-[10px] text-slate-400 ml-1">
+            — {selectedOrder?.manufacturerName || "Purchase Orders"}
+          </span>
+        </PageHeader>
 
         {/* Row 2: Filters + Actions */}
-        <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
+        <ActionToolbar justify="start">
           {/* Period with month name */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Period</label>
@@ -270,41 +268,34 @@ export function Orders() {
 
           <div className="w-px h-6 bg-slate-300" />
 
-          {/* Action Buttons — VIBRANT colors matching user request */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-1.5">
-            <button onClick={handleReset} className={cn(btnCls, "bg-[#1d4ed8] hover:bg-[#1e40af]")}>
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />Reset
-            </button>
-            <button className={cn(btnCls, "bg-[#047857] hover:bg-[#065f46]")}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" />New
-            </button>
-            <button className={cn(btnCls, "bg-[#ea580c] hover:bg-[#c2410c]")}>
-              <Send className="w-3.5 h-3.5 mr-1.5" />Post
-            </button>
-            <button className={cn(btnCls, "bg-[#b91c1c] hover:bg-[#991b1b]")}>
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete
-            </button>
-            <button className={cn(btnCls, "bg-[#4f46e5] hover:bg-[#4338ca]")}>
-              <Package className="w-3.5 h-3.5 mr-1.5" />Receive
-            </button>
-            <button className={cn(btnCls, "bg-[#334155] hover:bg-[#1e293b]")}>
-              <Printer className="w-3.5 h-3.5 mr-1.5" />Print
-            </button>
-            <button className={cn(btnCls, "bg-[#9333ea] hover:bg-[#7e22ce]")}>
-              <Mail className="w-3.5 h-3.5 mr-1.5" />Email
-            </button>
+            <ActionButton onClick={handleReset} variant="primary">
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />Reset
+            </ActionButton>
+            <ActionButton className="bg-[#047857] hover:bg-[#065f46] text-white" onClick={() => setSelectedOrderId(null)}>
+              <Plus className="w-3.5 h-3.5 mr-1" />New
+            </ActionButton>
+            <ActionButton variant="warning" onClick={handlePost}>
+              <Send className="w-3.5 h-3.5 mr-1" />Post
+            </ActionButton>
+            <ActionButton variant="danger">
+              <Trash2 className="w-3.5 h-3.5 mr-1" />Delete
+            </ActionButton>
+            <ActionButton className="bg-[#4f46e5] hover:bg-[#4338ca] text-white">
+              <Package className="w-3.5 h-3.5 mr-1" />Receive
+            </ActionButton>
+            <ActionButton className="bg-[#334155] hover:bg-[#1e293b] text-white">
+              <Printer className="w-3.5 h-3.5 mr-1" />Print
+            </ActionButton>
+            <ActionButton className="bg-[#9333ea] hover:bg-[#7e22ce] text-white">
+              <Mail className="w-3.5 h-3.5 mr-1" />Email
+            </ActionButton>
           </div>
 
           <div className="flex-1" />
 
           {/* Procedures */}
-          <div className="flex items-center gap-1">
-             <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap">Procedures</label>
-             <select className="px-2 py-1.5 text-xs font-medium border border-slate-300 rounded bg-white text-slate-700 outline-none w-[150px]">
-                <option value=""></option>
-             </select>
-          </div>
-
 
 
           {isLoading && (
@@ -312,16 +303,18 @@ export function Orders() {
               Loading...
             </span>
           )}
-        </div>
+        </ActionToolbar>
       </div>
 
       {/* ═══════════════ MAIN CONTENT: Document View ═══════════════ */}
       <div className="flex-1 overflow-hidden">
         <OrderDocument
+          ref={docRef}
           order={selectedOrder}
           manufacturers={mfgForDocument}
-          isNew={false}
+          isNew={!selectedOrder}
           onNavigate={navigateRecord}
+          onSave={() => loadOrders()}
         />
       </div>
 

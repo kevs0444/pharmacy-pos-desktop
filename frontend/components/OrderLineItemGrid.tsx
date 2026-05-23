@@ -23,8 +23,8 @@ export function emptyLineItem(rowIndex: number): LineItem {
     rowIndex,
     stockNo: "",
     stockName: "",
-    orderUnit: "",
-    pkgQty: "",
+    orderUnit: "EACH",
+    pkgQty: "1",
     quantity: "",
     unitCost: "",
     discPercent: "",
@@ -74,9 +74,22 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
 
   const handleCellChange = useCallback(
     (rowIndex: number, key: ColumnKey, value: string) => {
+      const numericColumns = ["pkgQty", "quantity", "unitCost", "discPercent", "netUcost", "extCost", "received"];
+      let finalValue = value;
+      
+      // Enforce number-only inputs for specific columns
+      if (numericColumns.includes(key) && value !== "") {
+        // Strip everything except numbers and a single decimal point
+        finalValue = value.replace(/[^0-9.]/g, '');
+        const decimalParts = finalValue.split('.');
+        if (decimalParts.length > 2) {
+          finalValue = decimalParts[0] + '.' + decimalParts.slice(1).join('');
+        }
+      }
+
       const updated = items.map((item) => {
         if (item.rowIndex !== rowIndex) return item;
-        const copy = { ...item, [key]: value };
+        const copy = { ...item, [key]: finalValue };
         // Auto-compute extCost when quantity or unitCost changes
         const qty = parseFloat(copy.quantity) || 0;
         const cost = parseFloat(copy.unitCost) || 0;

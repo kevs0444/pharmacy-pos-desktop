@@ -16,4 +16,9 @@ export class OrdersService {
   updateStatus(orderId: number, status: OrderStatus): void {
     this.ordersRepository.updateStatus(orderId, status)
   }
+
+  save(input: any): void {
+    const { items, ...order } = input
+    this.ordersRepository.saveOrder(order, items)
+  }
 }

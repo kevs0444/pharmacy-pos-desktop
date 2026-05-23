@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { cn } from "../lib/utils";
 import type { PurchaseOrderRecord } from "../../backend/types/domain";
 import { OrderLineItemGrid, emptyLineItem } from "./OrderLineItemGrid";
@@ -21,12 +21,17 @@ const STATUS_BADGE: Record<string, { label: string; cls: string; icon: any }> = 
 };
 
 
-export function OrderDocument({ 
+export interface OrderDocumentRef {
+  save: () => Promise<void>;
+}
+
+export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({ 
   order, 
   manufacturers, 
   isNew = false,
   onNavigate,
-}: OrderDocumentProps) {
+  onSave
+}, ref) => {
   // Local editable state seeded from the selected order
   const [docNo, setDocNo] = useState("");
   const [orderDate, setOrderDate] = useState("");
@@ -115,17 +120,17 @@ export function OrderDocument({
           const mapped: LineItem[] = dbItems.map((item, idx) => ({
             id: item.id,
             rowIndex: idx,
-            stockNo: String(idx + 1),
-            stockName: item.productName,
-            orderUnit: item.unitLabel || "EACH",
-            pkgQty: "",
-            quantity: String(item.quantityUnits),
-            unitCost: item.estimatedCost > 0 ? (item.estimatedCost / (item.quantityUnits || 1)).toFixed(2) : "",
-            discPercent: "",
-            netUcost: item.estimatedCost > 0 ? (item.estimatedCost / (item.quantityUnits || 1)).toFixed(2) : "",
-            extCost: item.estimatedCost > 0 ? item.estimatedCost.toFixed(2) : "",
-            received: "",
-            prNumber: "",
+            stockNo: item.stockNo || String(idx + 1),
+            stockName: item.stockName,
+            orderUnit: item.orderUnit || "",
+            pkgQty: item.pkgQty ? String(item.pkgQty) : "",
+            quantity: String(item.quantity),
+            unitCost: item.unitCost > 0 ? item.unitCost.toFixed(2) : "",
+            discPercent: item.discPercent > 0 ? item.discPercent.toFixed(2) : "",
+            netUcost: item.netUCost > 0 ? item.netUCost.toFixed(2) : "",
+            extCost: item.extCost > 0 ? item.extCost.toFixed(2) : "",
+            received: item.recvd > 0 ? String(item.recvd) : "",
+            prNumber: item.prNum || "",
             remarks: item.remarks || "",
           }));
           mapped.push(emptyLineItem(mapped.length));
@@ -140,6 +145,59 @@ export function OrderDocument({
     }
     loadItems();
   }, [order]);
+
+  useImperativeHandle(ref, () => ({
+    save: async () => {
+      // Find manufacturer ID from name
+      const mfg = manufacturers.find(m => m.name === supplier);
+      const mfgId = mfg ? mfg.id : null;
+      
+      const payload = {
+        id: order?.id,
+        manufacturerId: mfgId,
+        manufacturerName: supplier,
+        contactPerson: supplierInfo.contactPerson,
+        total: computedTotals.totalOrder,
+        status: status as any,
+        etaDate: null,
+        placedDate: orderDate,
+        priority: priority as any,
+        orderedByName: orderedBy,
+        remarks: remarks || null,
+        faxEmailRemarks: faxEmailRemarks || null,
+        notedBy: notedBy || null,
+        approvedBy: approvedBy || null,
+        qtyToOrder: qtyToOrder || null,
+        termsDays: parseInt(termsDays, 10) || 30,
+        payDueDate: payDueDate || null,
+        items: lineItems
+          .filter(i => i.stockName || parseFloat(i.quantity) > 0)
+          .map(i => ({
+            productId: null,
+            stockNo: i.stockNo || null,
+            stockName: i.stockName,
+            orderUnit: i.orderUnit || null,
+            pkgQty: parseFloat(i.pkgQty) || 1,
+            quantity: parseFloat(i.quantity) || 0,
+            unitCost: parseFloat(i.unitCost) || 0,
+            discPercent: parseFloat(i.discPercent) || 0,
+            netUCost: parseFloat(i.netUcost) || 0,
+            extCost: parseFloat(i.extCost) || 0,
+            prNum: i.prNumber || null,
+            remarks: i.remarks || null
+          }))
+      };
+
+      try {
+        await window.api.orders.save(payload);
+        if (onSave) onSave(payload as any);
+        alert("Order saved successfully!");
+      } catch (err) {
+        console.error("Failed to save order:", err);
+        alert("Failed to save order. Check console for details.");
+      }
+    }
+  }));
 
   const statusCfg = STATUS_BADGE[status] || STATUS_BADGE["Processing"];
   const StatusIcon = statusCfg.icon;
@@ -188,10 +246,9 @@ export function OrderDocument({
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Doc No</label>
               <div className="flex items-center gap-1.5 w-full max-w-[200px]">
                  <input type="text" value={docNo || ""} readOnly className="w-[110px] px-2 py-1 text-xs font-bold text-slate-800 outline-none bg-white border border-slate-300 rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all" />
-                 <div className="flex items-center bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
-                    <button onClick={() => onNavigate && onNavigate("prev")} className="px-1.5 py-1 hover:bg-slate-100 transition-colors text-slate-600 hover:text-slate-800 outline-none"><ChevronLeft className="w-3.5 h-3.5"/></button>
-                    <div className="w-px bg-slate-300 h-4"></div>
-                    <button onClick={() => onNavigate && onNavigate("next")} className="px-1.5 py-1 hover:bg-slate-100 transition-colors text-slate-600 hover:text-slate-800 outline-none"><ChevronRight className="w-3.5 h-3.5"/></button>
+                 <div className="flex items-center gap-0.5">
+                    <button onClick={() => onNavigate && onNavigate("prev")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronLeft className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => onNavigate && onNavigate("next")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronRight className="w-3.5 h-3.5"/></button>
                  </div>
                  <span className="text-[10px] font-bold text-slate-400 ml-1">2026-05</span>
               </div>
@@ -263,9 +320,9 @@ export function OrderDocument({
                <input type="checkbox" className="w-3.5 h-3.5 border-slate-300 text-blue-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer transition-shadow" />
              </div>
              <div className="flex items-start gap-2 mt-3 ml-[79px]">
-               <button className="text-[10px] font-bold text-rose-600 bg-rose-50 shadow-sm border border-rose-200 rounded hover:bg-rose-100 hover:border-rose-300 px-3 py-1.5 text-center leading-tight active:scale-95 transition-all">Email to<br/>supplier</button>
+               <button className="flex items-center justify-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95 bg-[#2b4c7e] hover:bg-[#1e3a63] text-center leading-tight">Email to<br/>supplier</button>
                <div className="flex flex-col items-center">
-                 <button className="text-[10px] font-bold text-rose-600 bg-rose-50 shadow-sm border border-rose-200 rounded hover:bg-rose-100 hover:border-rose-300 px-3 py-1.5 text-center leading-tight active:scale-95 transition-all">Send to<br/>Cloud</button>
+                 <button className="flex items-center justify-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95 bg-[#2b4c7e] hover:bg-[#1e3a63] text-center leading-tight">Send to<br/>Cloud</button>
                  <span className="text-[9px] font-bold text-blue-800 bg-blue-100 px-4 py-0.5 rounded-full mt-1.5 shadow-sm border border-blue-200">0</span>
                </div>
              </div>
@@ -367,4 +424,4 @@ export function OrderDocument({
       </div>
     </div>
   );
-}
+});

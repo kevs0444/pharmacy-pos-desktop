@@ -18,7 +18,7 @@ export class OrdersRepository {
         OR po.manufacturer_name LIKE @search ESCAPE '\\'
         OR EXISTS (
           SELECT 1 FROM purchase_order_items poi
-          WHERE poi.purchase_order_id = po.id AND poi.product_name LIKE @search ESCAPE '\\'
+          WHERE poi.purchase_order_id = po.id AND poi.stock_name LIKE @search ESCAPE '\\'
         )
       )`)
     }
@@ -96,14 +96,112 @@ export class OrdersRepository {
         `SELECT
           id,
           purchase_order_id AS purchaseOrderId,
-          product_name AS productName,
-          quantity_units AS quantityUnits,
-          unit_label AS unitLabel,
-          estimated_cost AS estimatedCost,
+          product_id AS productId,
+          stock_no AS stockNo,
+          stock_name AS stockName,
+          order_unit AS orderUnit,
+          pkg_qty AS pkgQty,
+          quantity,
+          unit_cost AS unitCost,
+          disc_percent AS discPercent,
+          net_ucost AS netUCost,
+          ext_cost AS extCost,
+          recvd,
+          pr_num AS prNum,
           remarks
         FROM purchase_order_items
         WHERE purchase_order_id = @orderId`
       )
       .all({ orderId }) as PurchaseOrderItemRecord[]
+  }
+
+  saveOrder(order: any, items: any[]): void {
+    const timestamp = new Date().toISOString()
+    
+    this.db.transaction(() => {
+      let orderId = order.id
+      
+      if (orderId) {
+        // Update existing
+        this.db.prepare(`
+          UPDATE purchase_orders SET
+            manufacturer_id = @manufacturerId,
+            manufacturer_name = @manufacturerName,
+            contact_person = @contactPerson,
+            total = @total,
+            status = @status,
+            eta_date = @etaDate,
+            priority = @priority,
+            remarks = @remarks,
+            fax_email_remarks = @faxEmailRemarks,
+            noted_by = @notedBy,
+            approved_by = @approvedBy,
+            qty_to_order = @qtyToOrder,
+            terms_days = @termsDays,
+            pay_due_date = @payDueDate,
+            updated_at = @updatedAt
+          WHERE id = @id
+        `).run({
+          ...order,
+          updatedAt: timestamp
+        })
+        
+        // Delete all old items
+        this.db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id = ?').run(orderId)
+      } else {
+        // Generate new order code if missing
+        let orderCode = order.orderCode
+        if (!orderCode) {
+          const year = new Date().getFullYear()
+          const ms = Date.now().toString().slice(-6)
+          orderCode = `PO-${year}-${ms}`
+        }
+
+        const result = this.db.prepare(`
+          INSERT INTO purchase_orders (
+            order_code, manufacturer_id, manufacturer_name, contact_person,
+            total, status, eta_date, placed_date, priority,
+            ordered_by_user_id, ordered_by_name, remarks, fax_email_remarks,
+            noted_by, approved_by, qty_to_order, terms_days, pay_due_date,
+            created_at, updated_at
+          ) VALUES (
+            @orderCode, @manufacturerId, @manufacturerName, @contactPerson,
+            @total, @status, @etaDate, @placedDate, @priority,
+            @orderedByUserId, @orderedByName, @remarks, @faxEmailRemarks,
+            @notedBy, @approvedBy, @qtyToOrder, @termsDays, @payDueDate,
+            @createdAt, @updatedAt
+          )
+        `).run({
+          ...order,
+          orderCode,
+          placedDate: order.placedDate || timestamp.split('T')[0],
+          createdAt: timestamp,
+          updatedAt: timestamp
+        })
+        orderId = result.lastInsertRowid
+      }
+
+      // Insert new items
+      const insertItem = this.db.prepare(`
+        INSERT INTO purchase_order_items (
+          purchase_order_id, product_id, stock_no, stock_name, order_unit,
+          pkg_qty, quantity, unit_cost, disc_percent, net_ucost, ext_cost,
+          recvd, pr_num, remarks
+        ) VALUES (
+          @purchaseOrderId, @productId, @stockNo, @stockName, @orderUnit,
+          @pkgQty, @quantity, @unitCost, @discPercent, @netUCost, @extCost,
+          @recvd, @prNum, @remarks
+        )
+      `)
+
+      for (const item of items) {
+        insertItem.run({
+          ...item,
+          purchaseOrderId: orderId,
+          recvd: item.recvd || 0,
+          pkgQty: item.pkgQty || 1
+        })
+      }
+    })()
   }
 }

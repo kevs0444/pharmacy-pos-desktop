@@ -105,13 +105,22 @@ export interface PurchaseOrderRecord {
   manufacturerName: string
   contactPerson: string | null
   total: number
-  status: OrderStatus
+  status: 'Processing' | 'In Transit' | 'Delivered' | 'Cancelled'
   etaDate: string | null
   placedDate: string
-  priority: OrderPriority
+  priority: 'Low' | 'Normal' | 'Urgent'
   orderedByUserId: number | null
   orderedByName: string | null
   remarks: string | null
+  faxEmailRemarks: string | null
+  notedBy: string | null
+  approvedBy: string | null
+  qtyToOrder: string | null
+  sysGen: boolean
+  termsDays: number
+  payDueDate: string | null
+  isClosed: boolean
+  isLocked: boolean
   createdAt: string
   updatedAt: string
 }
@@ -119,10 +128,18 @@ export interface PurchaseOrderRecord {
 export interface PurchaseOrderItemRecord {
   id: number
   purchaseOrderId: number
-  productName: string
-  quantityUnits: number
-  unitLabel: string | null
-  estimatedCost: number
+  productId: number | null
+  stockNo: string | null
+  stockName: string
+  orderUnit: string | null
+  pkgQty: number
+  quantity: number
+  unitCost: number
+  discPercent: number
+  netUCost: number
+  extCost: number
+  recvd: number
+  prNum: string | null
   remarks: string | null
 }
 

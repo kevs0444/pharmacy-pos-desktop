@@ -3,6 +3,7 @@ import { fixCategoriesMigration } from './002_fix_categories'
 import { deleteMockProductsMigration } from './003_delete_mock_products'
 import { inventoryChangeRequestsMigration } from './004_inventory_change_requests'
 import { customersMigration } from './005_customers'
+import { purchaseOrdersSchemaUpdateMigration } from './006_purchase_orders_schema_update'
 import type { Migration } from './types'
 
 export const migrations: Migration[] = [
@@ -11,6 +12,7 @@ export const migrations: Migration[] = [
   deleteMockProductsMigration,
   inventoryChangeRequestsMigration,
   customersMigration,
+  purchaseOrdersSchemaUpdateMigration,
 ]
 
 export type { Migration } from './types'

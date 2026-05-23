@@ -138,6 +138,43 @@ export interface OrderListQuery extends PaginationQuery {
   sortOrder?: 'asc' | 'desc'
 }
 
+export interface SaveOrderItemInput {
+  productId?: number | null
+  stockNo?: string | null
+  stockName: string
+  orderUnit?: string | null
+  pkgQty: number
+  quantity: number
+  unitCost: number
+  discPercent: number
+  netUCost: number
+  extCost: number
+  prNum?: string | null
+  remarks?: string | null
+}
+
+export interface SaveOrderInput {
+  id?: number
+  manufacturerId?: number | null
+  manufacturerName: string
+  contactPerson?: string | null
+  total: number
+  status: OrderStatus
+  etaDate?: string | null
+  placedDate: string
+  priority: OrderPriority
+  orderedByUserId?: number | null
+  orderedByName?: string | null
+  remarks?: string | null
+  faxEmailRemarks?: string | null
+  notedBy?: string | null
+  approvedBy?: string | null
+  qtyToOrder?: string | null
+  termsDays: number
+  payDueDate?: string | null
+  items: SaveOrderItemInput[]
+}
+
 export interface AdminUserListQuery extends PaginationQuery {
   search?: string
   role?: UserRole | 'All'
@@ -203,6 +240,7 @@ export interface PharmacyApi {
     list: (query?: OrderListQuery) => Promise<PaginatedResult<PurchaseOrderRecord>>
     getItems: (orderId: number) => Promise<PurchaseOrderItemRecord[]>
     updateStatus: (orderId: number, status: OrderStatus) => Promise<void>
+    save: (input: SaveOrderInput) => Promise<void>
   }
   admin: {
     listUsers: (query?: AdminUserListQuery) => Promise<PaginatedResult<Omit<UserRecord, 'passwordHash'>>>

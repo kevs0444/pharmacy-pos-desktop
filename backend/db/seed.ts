@@ -59,27 +59,33 @@ function generateMockPurchaseOrders() {
     { name: 'Vitamins Plus', contact: 'Ms. Bautista' },
     { name: 'Bayer', contact: 'Mr. Lim' }
   ]
-  const users = ['System Administrator', 'Branch Manager', 'Branch Staff']
 
-  for (let i = 1; i <= 120; i++) {
+  for (let i = 1; i <= 100; i++) {
     const status = statuses[Math.floor(Math.random() * statuses.length)]
     const priority = priorities[Math.floor(Math.random() * priorities.length)]
     const mfg = manufacturers[Math.floor(Math.random() * manufacturers.length)]
-    const user = users[Math.floor(Math.random() * users.length)]
+    const user = '01-MAIN'
     
     const itemsCount = Math.floor(Math.random() * 5) + 1
     const items = []
     let total = 0
     
     for (let j = 0; j < itemsCount; j++) {
-      const quantityUnits = Math.floor(Math.random() * 50) + 10
-      const estimatedCost = quantityUnits * (Math.floor(Math.random() * 500) + 50)
-      total += estimatedCost
+      const quantity = Math.floor(Math.random() * 50) + 10
+      const unitCost = Math.floor(Math.random() * 500) + 50
+      const extCost = quantity * unitCost
+      total += extCost
       items.push({
-        productName: `Mock Item ${i}-${j}`,
-        quantityUnits,
-        unitLabel: 'boxes',
-        estimatedCost,
+        stockName: `Mock Item ${i}-${j}`,
+        orderUnit: 'boxes',
+        pkgQty: 1,
+        quantity,
+        unitCost,
+        discPercent: 0,
+        netUcost: unitCost,
+        extCost,
+        recvd: 0,
+        prNum: null,
         remarks: null
       })
     }
@@ -96,9 +102,19 @@ function generateMockPurchaseOrders() {
       priority,
       orderedByName: user,
       remarks: null,
+      faxEmailRemarks: null,
+      notedBy: null,
+      approvedBy: null,
+      qtyToOrder: '1 month',
+      sysGen: 0,
+      termsDays: 30,
+      payDueDate: null,
+      isClosed: 0,
+      isLocked: 0,
       items
     })
   }
+
   return orders
 }
 
@@ -670,19 +686,23 @@ function seedPurchaseOrders(db: Database.Database): void {
     INSERT INTO purchase_orders (
       order_code, manufacturer_id, manufacturer_name, contact_person, total, status,
       eta_date, placed_date, priority, ordered_by_user_id, ordered_by_name, remarks,
-      created_at, updated_at
+      fax_email_remarks, noted_by, approved_by, qty_to_order, sys_gen, terms_days,
+      pay_due_date, is_closed, is_locked, created_at, updated_at
     ) VALUES (
       @orderCode, @manufacturerId, @manufacturerName, @contactPerson, @total, @status,
       @etaDate, @placedDate, @priority, @orderedByUserId, @orderedByName, @remarks,
-      @createdAt, @updatedAt
+      @faxEmailRemarks, @notedBy, @approvedBy, @qtyToOrder, @sysGen, @termsDays,
+      @payDueDate, @isClosed, @isLocked, @createdAt, @updatedAt
     )
   `)
 
   const insertItem = db.prepare(`
     INSERT INTO purchase_order_items (
-      purchase_order_id, product_name, quantity_units, unit_label, estimated_cost, remarks
+      purchase_order_id, stock_name, order_unit, pkg_qty, quantity, unit_cost,
+      disc_percent, net_ucost, ext_cost, recvd, pr_num, remarks
     ) VALUES (
-      @purchaseOrderId, @productName, @quantityUnits, @unitLabel, @estimatedCost, @remarks
+      @purchaseOrderId, @stockName, @orderUnit, @pkgQty, @quantity, @unitCost,
+      @discPercent, @netUcost, @extCost, @recvd, @prNum, @remarks
     )
   `)
 

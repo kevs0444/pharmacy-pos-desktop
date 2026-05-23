@@ -297,12 +297,71 @@ const customersMigration = {
     CREATE INDEX IF NOT EXISTS idx_customers_id_number ON customers (id_number);
   `
 };
+const purchaseOrdersSchemaUpdateMigration = {
+  id: "006",
+  name: "purchase_orders_schema_update",
+  up: `
+    -- Drop existing tables to recreate with the dense schema
+    DROP TABLE IF EXISTS purchase_order_items;
+    DROP TABLE IF EXISTS purchase_orders;
+
+    CREATE TABLE purchase_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_code TEXT NOT NULL UNIQUE,
+      manufacturer_id INTEGER,
+      manufacturer_name TEXT NOT NULL,
+      contact_person TEXT,
+      total REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL CHECK (status IN ('Processing', 'In Transit', 'Delivered', 'Cancelled')),
+      eta_date TEXT,
+      placed_date TEXT NOT NULL,
+      priority TEXT NOT NULL CHECK (priority IN ('Low', 'Normal', 'Urgent')),
+      ordered_by_user_id INTEGER,
+      ordered_by_name TEXT,
+      remarks TEXT,
+      fax_email_remarks TEXT,
+      noted_by TEXT,
+      approved_by TEXT,
+      qty_to_order TEXT,
+      sys_gen INTEGER NOT NULL DEFAULT 0,
+      terms_days INTEGER NOT NULL DEFAULT 30,
+      pay_due_date TEXT,
+      is_closed INTEGER NOT NULL DEFAULT 0,
+      is_locked INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (manufacturer_id) REFERENCES manufacturers (id),
+      FOREIGN KEY (ordered_by_user_id) REFERENCES users (id)
+    );
+
+    CREATE TABLE purchase_order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      purchase_order_id INTEGER NOT NULL,
+      product_id INTEGER,
+      stock_no TEXT,
+      stock_name TEXT NOT NULL,
+      order_unit TEXT,
+      pkg_qty INTEGER NOT NULL DEFAULT 1,
+      quantity INTEGER NOT NULL DEFAULT 0,
+      unit_cost REAL NOT NULL DEFAULT 0,
+      disc_percent REAL NOT NULL DEFAULT 0,
+      net_ucost REAL NOT NULL DEFAULT 0,
+      ext_cost REAL NOT NULL DEFAULT 0,
+      recvd INTEGER NOT NULL DEFAULT 0,
+      pr_num TEXT,
+      remarks TEXT,
+      FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders (id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products (id)
+    );
+  `
+};
 const migrations = [
   initialSchemaMigration,
   fixCategoriesMigration,
   deleteMockProductsMigration,
   inventoryChangeRequestsMigration,
-  customersMigration
+  customersMigration,
+  purchaseOrdersSchemaUpdateMigration
 ];
 const KEY_LENGTH = 64;
 function hashPassword(password) {
@@ -366,24 +425,30 @@ function generateMockPurchaseOrders() {
     { name: "Vitamins Plus", contact: "Ms. Bautista" },
     { name: "Bayer", contact: "Mr. Lim" }
   ];
-  const users = ["System Administrator", "Branch Manager", "Branch Staff"];
-  for (let i = 1; i <= 120; i++) {
+  for (let i = 1; i <= 100; i++) {
     const status = statuses[Math.floor(Math.random() * statuses.length)];
     const priority = priorities[Math.floor(Math.random() * priorities.length)];
     const mfg = manufacturers[Math.floor(Math.random() * manufacturers.length)];
-    const user = users[Math.floor(Math.random() * users.length)];
+    const user = "01-MAIN";
     const itemsCount = Math.floor(Math.random() * 5) + 1;
     const items = [];
     let total = 0;
     for (let j = 0; j < itemsCount; j++) {
-      const quantityUnits = Math.floor(Math.random() * 50) + 10;
-      const estimatedCost = quantityUnits * (Math.floor(Math.random() * 500) + 50);
-      total += estimatedCost;
+      const quantity = Math.floor(Math.random() * 50) + 10;
+      const unitCost = Math.floor(Math.random() * 500) + 50;
+      const extCost = quantity * unitCost;
+      total += extCost;
       items.push({
-        productName: `Mock Item ${i}-${j}`,
-        quantityUnits,
-        unitLabel: "boxes",
-        estimatedCost,
+        stockName: `Mock Item ${i}-${j}`,
+        orderUnit: "boxes",
+        pkgQty: 1,
+        quantity,
+        unitCost,
+        discPercent: 0,
+        netUcost: unitCost,
+        extCost,
+        recvd: 0,
+        prNum: null,
         remarks: null
       });
     }
@@ -399,6 +464,15 @@ function generateMockPurchaseOrders() {
       priority,
       orderedByName: user,
       remarks: null,
+      faxEmailRemarks: null,
+      notedBy: null,
+      approvedBy: null,
+      qtyToOrder: "1 month",
+      sysGen: 0,
+      termsDays: 30,
+      payDueDate: null,
+      isClosed: 0,
+      isLocked: 0,
       items
     });
   }
@@ -904,18 +978,22 @@ function seedPurchaseOrders(db) {
     INSERT INTO purchase_orders (
       order_code, manufacturer_id, manufacturer_name, contact_person, total, status,
       eta_date, placed_date, priority, ordered_by_user_id, ordered_by_name, remarks,
-      created_at, updated_at
+      fax_email_remarks, noted_by, approved_by, qty_to_order, sys_gen, terms_days,
+      pay_due_date, is_closed, is_locked, created_at, updated_at
     ) VALUES (
       @orderCode, @manufacturerId, @manufacturerName, @contactPerson, @total, @status,
       @etaDate, @placedDate, @priority, @orderedByUserId, @orderedByName, @remarks,
-      @createdAt, @updatedAt
+      @faxEmailRemarks, @notedBy, @approvedBy, @qtyToOrder, @sysGen, @termsDays,
+      @payDueDate, @isClosed, @isLocked, @createdAt, @updatedAt
     )
   `);
   const insertItem = db.prepare(`
     INSERT INTO purchase_order_items (
-      purchase_order_id, product_name, quantity_units, unit_label, estimated_cost, remarks
+      purchase_order_id, stock_name, order_unit, pkg_qty, quantity, unit_cost,
+      disc_percent, net_ucost, ext_cost, recvd, pr_num, remarks
     ) VALUES (
-      @purchaseOrderId, @productName, @quantityUnits, @unitLabel, @estimatedCost, @remarks
+      @purchaseOrderId, @stockName, @orderUnit, @pkgQty, @quantity, @unitCost,
+      @discPercent, @netUcost, @extCost, @recvd, @prNum, @remarks
     )
   `);
   for (const order of SEED_PURCHASE_ORDERS) {
@@ -1062,6 +1140,10 @@ class OrdersService {
   }
   updateStatus(orderId, status) {
     this.ordersRepository.updateStatus(orderId, status);
+  }
+  save(input) {
+    const { items, ...order } = input;
+    this.ordersRepository.saveOrder(order, items);
   }
 }
 class PosService {
@@ -1827,7 +1909,7 @@ class OrdersRepository {
         OR po.manufacturer_name LIKE @search ESCAPE '\\'
         OR EXISTS (
           SELECT 1 FROM purchase_order_items poi
-          WHERE poi.purchase_order_id = po.id AND poi.product_name LIKE @search ESCAPE '\\'
+          WHERE poi.purchase_order_id = po.id AND poi.stock_name LIKE @search ESCAPE '\\'
         )
       )`);
     }
@@ -1887,14 +1969,101 @@ class OrdersRepository {
       `SELECT
           id,
           purchase_order_id AS purchaseOrderId,
-          product_name AS productName,
-          quantity_units AS quantityUnits,
-          unit_label AS unitLabel,
-          estimated_cost AS estimatedCost,
+          product_id AS productId,
+          stock_no AS stockNo,
+          stock_name AS stockName,
+          order_unit AS orderUnit,
+          pkg_qty AS pkgQty,
+          quantity,
+          unit_cost AS unitCost,
+          disc_percent AS discPercent,
+          net_ucost AS netUCost,
+          ext_cost AS extCost,
+          recvd,
+          pr_num AS prNum,
           remarks
         FROM purchase_order_items
         WHERE purchase_order_id = @orderId`
     ).all({ orderId });
+  }
+  saveOrder(order, items) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    this.db.transaction(() => {
+      let orderId = order.id;
+      if (orderId) {
+        this.db.prepare(`
+          UPDATE purchase_orders SET
+            manufacturer_id = @manufacturerId,
+            manufacturer_name = @manufacturerName,
+            contact_person = @contactPerson,
+            total = @total,
+            status = @status,
+            eta_date = @etaDate,
+            priority = @priority,
+            remarks = @remarks,
+            fax_email_remarks = @faxEmailRemarks,
+            noted_by = @notedBy,
+            approved_by = @approvedBy,
+            qty_to_order = @qtyToOrder,
+            terms_days = @termsDays,
+            pay_due_date = @payDueDate,
+            updated_at = @updatedAt
+          WHERE id = @id
+        `).run({
+          ...order,
+          updatedAt: timestamp
+        });
+        this.db.prepare("DELETE FROM purchase_order_items WHERE purchase_order_id = ?").run(orderId);
+      } else {
+        let orderCode = order.orderCode;
+        if (!orderCode) {
+          const year = (/* @__PURE__ */ new Date()).getFullYear();
+          const ms = Date.now().toString().slice(-6);
+          orderCode = `PO-${year}-${ms}`;
+        }
+        const result = this.db.prepare(`
+          INSERT INTO purchase_orders (
+            order_code, manufacturer_id, manufacturer_name, contact_person,
+            total, status, eta_date, placed_date, priority,
+            ordered_by_user_id, ordered_by_name, remarks, fax_email_remarks,
+            noted_by, approved_by, qty_to_order, terms_days, pay_due_date,
+            created_at, updated_at
+          ) VALUES (
+            @orderCode, @manufacturerId, @manufacturerName, @contactPerson,
+            @total, @status, @etaDate, @placedDate, @priority,
+            @orderedByUserId, @orderedByName, @remarks, @faxEmailRemarks,
+            @notedBy, @approvedBy, @qtyToOrder, @termsDays, @payDueDate,
+            @createdAt, @updatedAt
+          )
+        `).run({
+          ...order,
+          orderCode,
+          placedDate: order.placedDate || timestamp.split("T")[0],
+          createdAt: timestamp,
+          updatedAt: timestamp
+        });
+        orderId = result.lastInsertRowid;
+      }
+      const insertItem = this.db.prepare(`
+        INSERT INTO purchase_order_items (
+          purchase_order_id, product_id, stock_no, stock_name, order_unit,
+          pkg_qty, quantity, unit_cost, disc_percent, net_ucost, ext_cost,
+          recvd, pr_num, remarks
+        ) VALUES (
+          @purchaseOrderId, @productId, @stockNo, @stockName, @orderUnit,
+          @pkgQty, @quantity, @unitCost, @discPercent, @netUCost, @extCost,
+          @recvd, @prNum, @remarks
+        )
+      `);
+      for (const item of items) {
+        insertItem.run({
+          ...item,
+          purchaseOrderId: orderId,
+          recvd: item.recvd || 0,
+          pkgQty: item.pkgQty || 1
+        });
+      }
+    })();
   }
 }
 class SettingsRepository {
@@ -2303,6 +2472,7 @@ function registerIpcHandlers(services) {
     "orders:updateStatus",
     ({ orderId, status }) => services.ordersService.updateStatus(orderId, status)
   );
+  registerHandler("orders:save", (payload) => services.ordersService.save(payload));
   registerHandler("admin:listUsers", (query) => services.adminService.listUsers(query));
   registerHandler("admin:listManufacturers", () => services.adminService.listManufacturers());
   registerHandler("admin:createManufacturer", (payload) => services.adminService.createManufacturer(payload));

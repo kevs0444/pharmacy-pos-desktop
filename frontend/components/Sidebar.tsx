@@ -6,26 +6,25 @@ import {
   MonitorPlay,
   LogOut,
   UserCircle,
-  ShieldCheck,
   Menu,
   Building2,
-  ClipboardCheck
+  BarChart3
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
 
 
 const settingsNav = [
-  { name: "POS Terminal", icon: MonitorPlay },
+  { name: "Sales", icon: ShoppingCart },
+  { name: "Sales Summary", icon: BarChart3 },
   { name: "Inventory", icon: Package },
-  { name: "Pending Changes", icon: ClipboardCheck },
-  { name: "Orders", icon: ShoppingCart },
-  { name: "Manufacturers", icon: Building2 },
+  { name: "Purchasing", icon: ShoppingCart },
+  { name: "Cashiering", icon: MonitorPlay },
   { name: "Dashboard", icon: LayoutDashboard },
-  { name: "Admin Panel", icon: ShieldCheck },
+  { name: "Branch", icon: Building2 },
 ];
 
-export type TabType = "Dashboard" | "Inventory" | "Orders" | "Sales" | "Reporting" | "POS Terminal" | "Profile" | "Admin Panel" | "Manufacturers" | "Pending Changes";
+export type TabType = "Dashboard" | "Inventory" | "Purchasing" | "Sales" | "Sales Summary" | "Reporting" | "Cashiering" | "Profile" | "Branch" | "Pending Changes";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -88,16 +87,8 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, userRole }: Sidebar
           )}
           <ul className="space-y-1">
             {settingsNav.map((item) => {
-              // Conditionally hide "Admin Panel" if userRole is not Admin
-              if (item.name === "Admin Panel" && userRole !== "Admin") {
-                 return null;
-              }
-              // Hide Manufacturers if userRole is Staff
-              if (item.name === "Manufacturers" && userRole === "Staff") {
-                 return null;
-              }
-              // Hide Pending Changes from Staff
-              if (item.name === "Pending Changes" && userRole === "Staff") {
+              // Conditionally hide "Branch" if userRole is not Admin
+              if (item.name === "Branch" && userRole !== "Admin") {
                  return null;
               }
 
