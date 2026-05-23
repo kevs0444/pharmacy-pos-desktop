@@ -18,7 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { PurchaseOrderRecord, ManufacturerRecord } from "../../backend/types/domain";
+import type { PurchaseOrderRecord, ManufacturerRecord, OrderStatus } from "../../backend/types/domain";
 
 // ─────────────────────────────────────────────────────
 // Helpers
@@ -64,7 +64,7 @@ export function Orders() {
   // ── Filters ──
   const [searchQuery, setSearchQuery] = useState("");
   const [gotoPoNumber, setGotoPoNumber] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("All");
+  const [filterStatus, setFilterStatus] = useState<OrderStatus | "All">("All");
   // dummy state to satisfy the onchange handlers that reset pagination
   const [, setCurrentPage] = useState(1);
   const [periodFilter, setPeriodFilter] = useState(() => new Date().toISOString().slice(0, 7));

@@ -250,7 +250,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
                     <button onClick={() => onNavigate && onNavigate("prev")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronLeft className="w-3.5 h-3.5"/></button>
                     <button onClick={() => onNavigate && onNavigate("next")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronRight className="w-3.5 h-3.5"/></button>
                  </div>
-                 <span className="text-[10px] font-bold text-slate-400 ml-1">2026-05</span>
+                 <span className="text-[10px] font-bold text-slate-400 ml-1">{orderDate ? orderDate.slice(0, 7) : ""}</span>
               </div>
             </div>
             

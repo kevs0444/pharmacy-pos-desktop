@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { cn } from "../lib/utils";
 
 export interface LineItem {
@@ -71,6 +71,27 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<{row: number, col: number} | null>(null);
+
+  // Search products when typing in stockName
+  const searchProducts = useCallback(async (query: string, rowIndex: number, colIndex: number) => {
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const res = await window.api.inventory.list({ search: query, page: 1, pageSize: 20 });
+      setSuggestions(res.items || []);
+      if (res.items.length > 0) {
+        setShowSuggestions({ row: rowIndex, col: colIndex });
+      } else {
+        setSuggestions([]);
+      }
+    } catch (e) {
+      console.error("Error searching products:", e);
+    }
+  }, []);
 
   const handleCellChange = useCallback(
     (rowIndex: number, key: ColumnKey, value: string) => {
@@ -125,6 +146,21 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
     },
     [items, onItemsChange]
   );
+
+  const applySuggestion = useCallback((item: any, rowIndex: number) => {
+    const updated = items.map((row) => {
+      if (row.rowIndex !== rowIndex) return row;
+      return {
+        ...row,
+        stockNo: item.stockNo || "",
+        stockName: item.name || "",
+        orderUnit: item.baseUnit || "EACH",
+        unitCost: item.unitCost ? item.unitCost.toFixed(2) : "",
+      };
+    });
+    onItemsChange(updated);
+    setShowSuggestions(null);
+  }, [items, onItemsChange]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, rowIdx: number, colIdx: number) => {
@@ -221,7 +257,7 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
                   <div
                     key={col.key}
                     className={cn(
-                      "border-r border-slate-100 last:border-r-0 shrink-0 px-0.5 py-0.5",
+                      "relative border-r border-slate-100 last:border-r-0 shrink-0 px-0.5 py-0.5",
                       col.width
                     )}
                   >
@@ -231,24 +267,58 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
                       data-col={colIdx}
                       value={item[col.key]}
                       readOnly={readOnly || isComputed}
-                      onChange={(e) => handleCellChange(item.rowIndex, col.key, e.target.value)}
-                      onBlur={() => handleCellBlur(item.rowIndex, col.key, col.isPrice)}
+                      onChange={(e) => {
+                        handleCellChange(item.rowIndex, col.key, e.target.value);
+                        if (col.key === "stockName") searchProducts(e.target.value, item.rowIndex, colIdx);
+                      }}
+                      onBlur={() => {
+                        handleCellBlur(item.rowIndex, col.key, col.isPrice);
+                        setTimeout(() => setShowSuggestions(null), 200);
+                      }}
                       onFocus={() => {
                         setSelectedRow(rowIdx);
                         setSelectedCol(colIdx);
+                        if (col.key === "stockName" && item.stockName.length >= 2) {
+                          searchProducts(item.stockName, item.rowIndex, colIdx);
+                        }
                       }}
                       onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx)}
                       className={cn(
-                        "w-full h-full px-1.5 py-1.5 text-xs font-medium border-0 outline-none transition-colors",
+                        "w-full px-1 py-1 text-xs outline-none border-2 border-transparent focus:border-blue-500 font-bold",
                         col.align,
-                        isComputed
-                          ? "bg-slate-50 text-slate-500 cursor-default"
-                          : "bg-transparent text-slate-700 focus:bg-white focus:ring-1 focus:ring-blue-400 focus:rounded-sm",
-                        readOnly && "cursor-default"
+                        isComputed && "text-slate-500 bg-slate-50",
+                        !isComputed && !readOnly && "hover:bg-slate-50 focus:bg-white text-slate-800",
+                        col.isPrice && "font-mono"
                       )}
-                      placeholder={isEmpty && colIdx === 0 ? "▸" : ""}
+                      placeholder={col.key === "stockNo" || col.key === "stockName" ? "" : undefined}
                       tabIndex={isComputed ? -1 : 0}
                     />
+                    {/* Autocomplete Dropdown */}
+                    {col.key === "stockName" && showSuggestions?.row === item.rowIndex && showSuggestions?.col === colIdx && suggestions.length > 0 && (
+                      <div className="absolute top-full left-0 mt-1 w-[500px] bg-white border border-slate-300 shadow-xl rounded z-50 max-h-[250px] overflow-y-auto">
+                        <div className="sticky top-0 bg-slate-100 text-[9px] font-bold text-slate-500 uppercase px-2 py-1 flex border-b border-slate-200">
+                          <div className="w-[80px]">Stock No</div>
+                          <div className="flex-1">Name</div>
+                          <div className="w-[50px] text-right">Unit</div>
+                          <div className="w-[60px] text-right">Cost</div>
+                        </div>
+                        {suggestions.map((sug, i) => (
+                          <div 
+                            key={i} 
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent input blur
+                              applySuggestion(sug, item.rowIndex);
+                            }}
+                            className="flex text-[10px] px-2 py-1.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0 items-center"
+                          >
+                            <div className="w-[80px] font-mono text-slate-500">{sug.stockNo}</div>
+                            <div className="flex-1 font-bold text-slate-800 truncate pr-2">{sug.name}</div>
+                            <div className="w-[50px] text-right text-slate-500">{sug.baseUnit}</div>
+                            <div className="w-[60px] text-right text-green-700 font-bold">{sug.unitCost?.toFixed(2)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
