@@ -4,6 +4,7 @@ import { deleteMockProductsMigration } from './003_delete_mock_products'
 import { inventoryChangeRequestsMigration } from './004_inventory_change_requests'
 import { customersMigration } from './005_customers'
 import { purchaseOrdersSchemaUpdateMigration } from './006_purchase_orders_schema_update'
+import { addShelfLocationMigration } from './007_add_shelf_location'
 import type { Migration } from './types'
 
 export const migrations: Migration[] = [
@@ -13,6 +14,7 @@ export const migrations: Migration[] = [
   inventoryChangeRequestsMigration,
   customersMigration,
   purchaseOrdersSchemaUpdateMigration,
+  addShelfLocationMigration,
 ]
 
 export type { Migration } from './types'

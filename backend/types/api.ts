@@ -72,6 +72,7 @@ export interface CreateProductInput {
   brandType: ProductBrandType
   category: ProductCategory
   subCategory: ProductSubCategory
+  shelfLocation?: string | null
   packagingUnit: string
   baseUnit: string
   piecesPerUnit: number
@@ -93,6 +94,7 @@ export interface UpdateProductInput {
   brandType: ProductBrandType
   category: ProductCategory
   subCategory: ProductSubCategory
+  shelfLocation?: string | null
   packagingUnit: string
   baseUnit: string
   piecesPerUnit: number

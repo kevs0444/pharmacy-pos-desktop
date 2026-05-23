@@ -8,6 +8,14 @@ export type ProductCategory =
   | 'Medical Supplies'
   | 'Personal Care'
   | 'Baby & Mom'
+  | 'BRD'
+  | 'BUNDLE'
+  | 'CG'
+  | 'GALE'
+  | 'GEN'
+  | 'MSUP'
+  | 'REF'
+  | 'STORE USE'
 export type ProductSubCategory =
   | 'Prescription (Rx)'
   | 'OTC'
@@ -83,6 +91,7 @@ export interface ProductRecord {
   brandType: ProductBrandType
   category: ProductCategory
   subCategory: ProductSubCategory
+  shelfLocation: string | null
   packagingUnit: string
   baseUnit: string
   piecesPerUnit: number

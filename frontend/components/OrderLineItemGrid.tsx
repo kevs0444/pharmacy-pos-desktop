@@ -204,18 +204,18 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
   }, [selectedRow, selectedCol]);
 
   return (
-    <div ref={gridRef} className="border border-slate-300 rounded-md overflow-hidden bg-white">
+    <div ref={gridRef} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
       {/* Header */}
-      <div className="flex bg-slate-700 sticky top-0 z-10 shadow-sm">
+      <div className="flex bg-gradient-to-b from-slate-700 to-slate-800 sticky top-0 z-10">
         {/* Row number header */}
-        <div className="w-[36px] shrink-0 flex items-center justify-center border-r border-slate-600 bg-slate-700/90">
-          <span className="text-[9px] font-black text-slate-400">#</span>
+        <div className="w-[36px] shrink-0 flex items-center justify-center border-r border-slate-600">
+          <span className="text-[9px] font-extrabold text-slate-400">#</span>
         </div>
         {COLUMNS.map((col) => (
           <div
             key={col.key}
             className={cn(
-              "px-1.5 py-2 text-[10px] font-black uppercase tracking-wider text-slate-200 border-r border-slate-600 last:border-r-0 shrink-0 shadow-sm",
+              "px-1.5 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-300 border-r border-slate-600/50 last:border-r-0 shrink-0",
               col.width,
               col.align
             )}
@@ -328,7 +328,7 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false }: Or
       </div>
 
       {/* Footer summary */}
-      <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-b from-slate-50 to-slate-100 border-t-2 border-slate-300 text-[10px] font-bold text-slate-500">
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10px] font-bold text-slate-500">
         <span>
           {items.filter((i) => i.stockName || i.quantity).length} item(s)
         </span>

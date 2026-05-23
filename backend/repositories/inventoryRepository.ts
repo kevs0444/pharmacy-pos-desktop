@@ -21,6 +21,7 @@ type ProductRow = {
   brandType: ProductRecord['brandType']
   category: ProductRecord['category']
   subCategory: ProductRecord['subCategory']
+  shelfLocation: string | null
   packagingUnit: string
   baseUnit: string
   piecesPerUnit: number
@@ -99,6 +100,7 @@ export class InventoryRepository {
           p.brand_type AS brandType,
           p.category,
           p.sub_category AS subCategory,
+          p.shelf_location AS shelfLocation,
           p.packaging_unit AS packagingUnit,
           p.base_unit AS baseUnit,
           p.pieces_per_unit AS piecesPerUnit,
@@ -170,12 +172,12 @@ export class InventoryRepository {
       const insertProduct = this.db.prepare(`
         INSERT INTO products (
           code, name, generic_name, manufacturer_id, brand_type, category, sub_category,
-          packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
+          shelf_location, packaging_unit, base_unit, pieces_per_unit, total_stock_pieces, unit_price_cost,
           selling_price_per_unit, selling_price_per_piece, discount, is_active, sales_count,
           status, created_at, updated_at
         ) VALUES (
           @code, @name, @genericName, @manufacturerId, @brandType, @category, @subCategory,
-          @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
+          @shelfLocation, @packagingUnit, @baseUnit, @piecesPerUnit, @totalStockPieces, @unitPriceCost,
           @sellingPricePerUnit, @sellingPricePerPiece, @discount, @isActive, @salesCount,
           @status, @createdAt, @updatedAt
         )
@@ -189,6 +191,7 @@ export class InventoryRepository {
         brandType: input.brandType,
         category: input.category,
         subCategory: input.subCategory,
+        shelfLocation: input.shelfLocation ?? null,
         packagingUnit: input.packagingUnit,
         baseUnit: input.baseUnit,
         piecesPerUnit: input.piecesPerUnit,
@@ -271,6 +274,7 @@ export class InventoryRepository {
         brand_type = @brandType,
         category = @category,
         sub_category = @subCategory,
+        shelf_location = @shelfLocation,
         packaging_unit = @packagingUnit,
         base_unit = @baseUnit,
         pieces_per_unit = @piecesPerUnit,
@@ -293,6 +297,7 @@ export class InventoryRepository {
       brandType: input.brandType,
       category: input.category,
       subCategory: input.subCategory,
+      shelfLocation: input.shelfLocation ?? null,
       packagingUnit: input.packagingUnit,
       baseUnit: input.baseUnit,
       piecesPerUnit: input.piecesPerUnit,
@@ -537,6 +542,7 @@ export class InventoryRepository {
           p.brand_type AS brandType,
           p.category,
           p.sub_category AS subCategory,
+          p.shelf_location AS shelfLocation,
           p.packaging_unit AS packagingUnit,
           p.base_unit AS baseUnit,
           p.pieces_per_unit AS piecesPerUnit,
@@ -572,6 +578,7 @@ export class InventoryRepository {
           p.brand_type AS brandType,
           p.category,
           p.sub_category AS subCategory,
+          p.shelf_location AS shelfLocation,
           p.packaging_unit AS packagingUnit,
           p.base_unit AS baseUnit,
           p.pieces_per_unit AS piecesPerUnit,
@@ -612,6 +619,7 @@ export class InventoryRepository {
           p.brand_type AS brandType,
           p.category,
           p.sub_category AS subCategory,
+          p.shelf_location AS shelfLocation,
           p.packaging_unit AS packagingUnit,
           p.base_unit AS baseUnit,
           p.pieces_per_unit AS piecesPerUnit,

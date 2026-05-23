@@ -219,27 +219,27 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* ── Document Header ── */}
-      <div className="bg-slate-200 border-b-2 border-slate-300 px-4 py-2 shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <span className={cn("text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border flex items-center gap-1.5", statusCfg.cls)}>
+      <div className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className={cn("text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1.5", statusCfg.cls)}>
               <StatusIcon className="w-3 h-3" />
               {statusCfg.label}
             </span>
             {priority === "Urgent" && (
-              <span className="text-[10px] font-black uppercase bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200">
+              <span className="text-[10px] font-extrabold uppercase bg-red-100 text-red-600 px-2 py-1 rounded-full border border-red-200">
                 🚨 Urgent
               </span>
             )}
           </div>
         </div>
 
-        {/* Form fields — 4-column partitioned layout */}
-        <div className="grid grid-cols-[1.5fr_1.2fr_1fr_0.8fr] gap-4">
+        {/* Form fields — 4-column layout */}
+        <div className="grid grid-cols-[1.5fr_1.2fr_1fr_0.8fr] gap-3">
           {/* Column 1: Order Details */}
-          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative pt-3.5 transition-shadow hover:shadow-md">
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
             <div className="absolute -top-[10px] left-3 bg-white px-1.5">
-              <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest shadow-sm">Order Details</span>
+              <span className="text-[9px] font-extrabold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">Order Details</span>
             </div>
             
             <div className="flex items-center gap-1 mt-1">
@@ -291,9 +291,9 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
           </div>
 
           {/* Column 2: Approvals */}
-          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative pt-3.5 transition-shadow hover:shadow-md">
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
             <div className="absolute -top-[10px] left-3 bg-white px-1.5">
-              <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest shadow-sm">Approvals & Workflow</span>
+              <span className="text-[9px] font-extrabold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">Approvals & Workflow</span>
             </div>
              
              <div className="flex items-center gap-1 mt-1">
@@ -329,9 +329,9 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
           </div>
 
           {/* Column 3: Terms & Contact */}
-          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative pt-3.5 transition-shadow hover:shadow-md">
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
              <div className="absolute -top-[10px] left-3 bg-white px-1.5">
-               <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest shadow-sm">Terms & Contact</span>
+               <span className="text-[9px] font-extrabold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">Terms & Contact</span>
              </div>
              
              <div className="flex items-center gap-1 mt-1">
@@ -377,9 +377,9 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
           </div>
 
           {/* Column 4: Summary */}
-          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm relative flex flex-col h-full pt-3.5 transition-shadow hover:shadow-md">
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative flex flex-col h-full pt-4">
              <div className="absolute -top-[10px] left-3 bg-white px-1.5">
-               <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest shadow-sm">Summary</span>
+               <span className="text-[9px] font-extrabold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">Summary</span>
              </div>
              
              <div className="flex items-center gap-1 mt-1">
@@ -413,14 +413,17 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
       </div>
 
       {/* ── Line Items Grid ── */}
-      <div className="flex-1 overflow-auto p-4 bg-slate-50/70">
+      <div className="flex-1 overflow-auto p-4 bg-slate-50">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] text-slate-400 font-medium">
+            💡 Type in the <strong>Stock Name</strong> column to search and select items from inventory.
+          </p>
+        </div>
         <OrderLineItemGrid
           items={lineItems}
           onItemsChange={setLineItems}
           readOnly={isLocked}
         />
-
-
       </div>
     </div>
   );
