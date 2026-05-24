@@ -333,16 +333,15 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
 
           <button 
             onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
-            className="text-slate-400 hover:text-brand-blue hover:bg-blue-50 p-1.5 rounded-lg transition-colors flex items-center justify-center shrink-0 border border-transparent hover:border-blue-100"
-            title={isHeaderExpanded ? "Minimize Header" : "Expand Header"}
+            className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors shadow-sm"
           >
-            {isHeaderExpanded ? <ChevronLeft className="w-4 h-4 rotate-90" /> : <ChevronRight className="w-4 h-4 -rotate-90" />}
+            {isHeaderExpanded ? "Minimize Header" : "Expand Header"}
           </button>
         </div>
 
         {/* Form fields — Responsive 4-column layout */}
         {isHeaderExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {/* Column 1: Order Details */}
           <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
             <div className="absolute -top-[10px] left-3 bg-white px-1.5">
