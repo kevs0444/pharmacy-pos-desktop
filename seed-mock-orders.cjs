@@ -91,7 +91,7 @@ app.whenReady().then(() => {
       insertItem.run({
         purchaseOrderId,
         stockName: 'Amoxicillin 500mg',
-        orderUnit: 'Box',
+        orderUnit: 'EACH',
         pkgQty: 1,
         quantity,
         unitCost,

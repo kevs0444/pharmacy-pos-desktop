@@ -1,9 +1,14 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../lib/utils";
+import { DEFAULT_ORDER_UNIT, formatFiveDigitStockNo, toOrderUpper, toTrimmedOrderUpper } from "../lib/orderFormatting";
+import type { ProductRecord } from "../../backend/types/domain";
+import type { NotificationInput } from "./ui/NotificationCenter";
+import { getErrorMessage } from "./ui/NotificationCenter";
 
 export interface LineItem {
   id?: number;
+  productId?: number | null;
   rowIndex: number;
   stockNo: string;
   stockName: string;
@@ -21,11 +26,12 @@ export interface LineItem {
 
 export function emptyLineItem(rowIndex: number): LineItem {
   return {
+    productId: null,
     rowIndex,
     stockNo: "",
     stockName: "",
-    orderUnit: "EACH",
-    pkgQty: "1",
+    orderUnit: "",
+    pkgQty: "",
     quantity: "",
     unitCost: "",
     discPercent: "",
@@ -42,6 +48,7 @@ interface OrderLineItemGridProps {
   onItemsChange: (items: LineItem[]) => void;
   readOnly?: boolean;
   isLoading?: boolean;
+  onNotify?: (notification: NotificationInput) => void;
 }
 
 // Columns for the spreadsheet — "#" is the row-number gutter, NOT a data column
@@ -62,18 +69,38 @@ const COLUMNS = [
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
 
-/** Format a numeric string to 0.00 */
-function formatPrice(val: string): string {
-  const num = parseFloat(val);
-  if (isNaN(num)) return val;
-  return num.toFixed(2);
+export function parseNumber(val: string | number): number {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  return parseFloat(val.replace(/,/g, '')) || 0;
 }
 
-export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLoading = false }: OrderLineItemGridProps) {
+/** Format a numeric string to 0.00 */
+export function formatPrice(val: string | number): string {
+  const num = parseNumber(val);
+  if (isNaN(num)) return val.toString();
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function hasLineContent(item: LineItem): boolean {
+  return Boolean(item.stockName || item.quantity || item.unitCost || item.stockNo);
+}
+
+function getNextRowIndex(items: LineItem[]): number {
+  return items.reduce((max, item) => Math.max(max, item.rowIndex), -1) + 1;
+}
+
+export function OrderLineItemGrid({
+  items,
+  onItemsChange,
+  readOnly = false,
+  isLoading = false,
+  onNotify,
+}: OrderLineItemGridProps) {
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<ProductRecord[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<{row: number, col: number} | null>(null);
 
   // Pagination & Search
@@ -134,12 +161,19 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
       }
     } catch (e) {
       console.error("Error searching products:", e);
+      onNotify?.({
+        variant: "error",
+        title: "Product search failed",
+        message: getErrorMessage(e, "Unable to search inventory for the order spreadsheet."),
+        source: "backend",
+      });
     }
-  }, []);
+  }, [onNotify]);
 
   const handleCellChange = useCallback(
     (rowIndex: number, key: ColumnKey, value: string) => {
       const numericColumns = ["pkgQty", "quantity", "unitCost", "discPercent", "netUcost", "extCost", "received"];
+      const uppercaseColumns = ["stockName", "orderUnit", "prNumber", "remarks"];
       let finalValue = value;
       
       // Enforce number-only inputs for specific columns
@@ -152,23 +186,41 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
         }
       }
 
+      if (key === "stockNo") {
+        finalValue = value.replace(/\D/g, "").slice(0, 5);
+      }
+
+      if (uppercaseColumns.includes(key)) {
+        finalValue = toOrderUpper(value);
+      }
+
       const updated = items.map((item) => {
         if (item.rowIndex !== rowIndex) return item;
+
+        const wasEmpty = !hasLineContent(item);
         const copy = { ...item, [key]: finalValue };
+        const isNowEmpty = !hasLineContent(copy);
+
+        // Initialize defaults if row just became active
+        if (wasEmpty && !isNowEmpty) {
+          if (!copy.orderUnit) copy.orderUnit = DEFAULT_ORDER_UNIT;
+          if (!copy.pkgQty) copy.pkgQty = "1";
+        }
+
         // Auto-compute extCost when quantity or unitCost changes
-        const qty = parseFloat(copy.quantity) || 0;
-        const cost = parseFloat(copy.unitCost) || 0;
-        const disc = parseFloat(copy.discPercent) || 0;
+        const qty = parseNumber(copy.quantity);
+        const cost = parseNumber(copy.unitCost);
+        const disc = parseNumber(copy.discPercent);
         const netCost = cost * (1 - disc / 100);
-        copy.netUcost = cost > 0 ? netCost.toFixed(2) : "";
-        copy.extCost = qty > 0 && cost > 0 ? (qty * netCost).toFixed(2) : "";
+        copy.netUcost = cost > 0 ? formatPrice(netCost) : "";
+        copy.extCost = qty > 0 && cost > 0 ? formatPrice(qty * netCost) : "";
         return copy;
       });
 
       // Auto-append if editing the last row and it now has content
       const lastItem = updated[updated.length - 1];
-      if (lastItem && (lastItem.stockName || lastItem.quantity || lastItem.unitCost)) {
-        updated.push(emptyLineItem(updated.length));
+      if (lastItem && hasLineContent(lastItem)) {
+        updated.push(emptyLineItem(getNextRowIndex(updated)));
       }
 
       onItemsChange(updated);
@@ -179,29 +231,59 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
   /** On blur: format price fields to 0.00 */
   const handleCellBlur = useCallback(
     (rowIndex: number, key: ColumnKey, isPrice: boolean) => {
-      if (!isPrice) return;
+      if (!isPrice && key !== "stockNo" && key !== "orderUnit") return;
       const updated = items.map((item) => {
         if (item.rowIndex !== rowIndex) return item;
         const raw = item[key];
-        if (!raw) return item;
-        return { ...item, [key]: formatPrice(raw) };
+        if (!raw && key !== "orderUnit") return item;
+
+        let nextValue = raw;
+        if (key === "stockNo") nextValue = formatFiveDigitStockNo(raw);
+        if (key === "orderUnit") {
+          nextValue = toTrimmedOrderUpper(raw);
+          if (!nextValue && hasLineContent(item)) {
+            nextValue = DEFAULT_ORDER_UNIT;
+          }
+        }
+        if (isPrice && nextValue) nextValue = formatPrice(nextValue);
+
+        return { ...item, [key]: nextValue };
       });
       onItemsChange(updated);
     },
     [items, onItemsChange]
   );
 
-  const applySuggestion = useCallback((item: any, rowIndex: number) => {
-    const updated = items.map((row) => {
+  const applySuggestion = useCallback((item: ProductRecord, rowIndex: number) => {
+    let updated = items.map((row) => {
       if (row.rowIndex !== rowIndex) return row;
+      const quantity = row.quantity || "1";
+      const unitCost = item.unitPriceCost > 0 ? item.unitPriceCost.toString() : row.unitCost;
+      const qty = parseNumber(quantity);
+      const cost = parseNumber(unitCost);
+      const disc = parseNumber(row.discPercent);
+      const netCost = cost * (1 - disc / 100);
+
       return {
         ...row,
-        stockNo: item.stockNo || "",
-        stockName: item.name || "",
-        orderUnit: item.baseUnit || "EACH",
-        unitCost: item.unitCost ? item.unitCost.toFixed(2) : "",
+        productId: item.id,
+        stockNo: formatFiveDigitStockNo(item.code, row.rowIndex + 1),
+        stockName: toTrimmedOrderUpper(item.name),
+        orderUnit: DEFAULT_ORDER_UNIT,
+        pkgQty: row.pkgQty || "1",
+        quantity,
+        unitCost: cost > 0 ? formatPrice(cost) : "",
+        discPercent: row.discPercent,
+        netUcost: cost > 0 ? formatPrice(netCost) : "",
+        extCost: qty > 0 && cost > 0 ? formatPrice(qty * netCost) : "",
       };
     });
+
+    const lastItem = updated[updated.length - 1];
+    if (lastItem && hasLineContent(lastItem)) {
+      updated = [...updated, emptyLineItem(getNextRowIndex(updated))];
+    }
+
     onItemsChange(updated);
     setShowSuggestions(null);
   }, [items, onItemsChange]);
@@ -263,7 +345,7 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
-            Pg {gridPage} / {totalGridPages} <span className="text-slate-400 font-normal">({filteredItems.length})</span>
+            Pg {gridPage} / {totalGridPages} <span className="text-slate-400 font-normal">({filteredItems.filter(hasLineContent).length})</span>
           </span>
           <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-sm">
             <button 
@@ -385,55 +467,56 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
                           col.align,
                           isComputed && "text-slate-500 bg-slate-50",
                           !isComputed && !readOnly && "hover:bg-slate-50 focus:bg-white text-slate-800",
+                          (col.key === "stockName" || col.key === "orderUnit" || col.key === "prNumber" || col.key === "remarks") && "uppercase",
                           col.isPrice && "font-mono"
                         )}
                         placeholder={col.key === "stockNo" || col.key === "stockName" ? "" : undefined}
                         tabIndex={isComputed ? -1 : 0}
                       />
-                    {/* Autocomplete Dropdown */}
-                    {col.key === "stockName" && showSuggestions?.row === item.rowIndex && showSuggestions?.col === colIdx && suggestions.length > 0 && (
-                      <div className="absolute top-full left-0 mt-1 w-[500px] bg-white border border-slate-300 shadow-xl rounded z-50 max-h-[250px] overflow-y-auto">
-                        <div className="sticky top-0 bg-slate-100 text-[9px] font-bold text-slate-500 uppercase px-2 py-1 flex border-b border-slate-200">
-                          <div className="w-[80px]">Stock No</div>
-                          <div className="flex-1">Name</div>
-                          <div className="w-[50px] text-right">Unit</div>
-                          <div className="w-[60px] text-right">Cost</div>
-                        </div>
-                        {suggestions.map((sug, i) => (
-                          <div 
-                            key={i} 
-                            onMouseDown={(e) => {
-                              e.preventDefault(); // Prevent input blur
-                              applySuggestion(sug, item.rowIndex);
-                            }}
-                            className="flex text-[10px] px-2 py-1.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0 items-center"
-                          >
-                            <div className="w-[80px] font-mono text-slate-500">{sug.stockNo}</div>
-                            <div className="flex-1 font-bold text-slate-800 truncate pr-2">{sug.name}</div>
-                            <div className="w-[50px] text-right text-slate-500">{sug.baseUnit}</div>
-                            <div className="w-[60px] text-right text-green-700 font-bold">{sug.unitCost?.toFixed(2)}</div>
+                      {/* Autocomplete Dropdown */}
+                      {col.key === "stockName" && showSuggestions?.row === item.rowIndex && showSuggestions?.col === colIdx && suggestions.length > 0 && (
+                        <div className="absolute top-full left-0 mt-1 w-[500px] bg-white border border-slate-300 shadow-xl rounded z-50 max-h-[250px] overflow-y-auto">
+                          <div className="sticky top-0 bg-slate-100 text-[9px] font-bold text-slate-500 uppercase px-2 py-1 flex border-b border-slate-200">
+                            <div className="w-[80px]">Stock No</div>
+                            <div className="flex-1">Name</div>
+                            <div className="w-[50px] text-right">Unit</div>
+                            <div className="w-[60px] text-right">Cost</div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })
+                          {suggestions.map((sug, i) => (
+                            <div 
+                              key={i} 
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent input blur
+                                applySuggestion(sug, item.rowIndex);
+                              }}
+                              className="flex text-[10px] px-2 py-1.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0 items-center"
+                            >
+                              <div className="w-[80px] font-mono text-slate-500">{formatFiveDigitStockNo(sug.code, i + 1)}</div>
+                              <div className="flex-1 font-bold text-slate-800 truncate pr-2">{toOrderUpper(sug.name)}</div>
+                              <div className="w-[50px] text-right text-slate-500">{DEFAULT_ORDER_UNIT}</div>
+                              <div className="w-[60px] text-right text-green-700 font-bold">{sug.unitPriceCost?.toFixed(2)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })
         )}
       </div>
 
       {/* Footer summary */}
       <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10px] font-bold text-slate-500">
         <span>
-          {items.filter((i) => i.stockName || i.quantity).length} item(s)
+          {items.filter(hasLineContent).length} item(s)
         </span>
         <span>
           Total: ₱
           {items
-            .reduce((sum, item) => sum + (parseFloat(item.extCost) || 0), 0)
+            .reduce((sum, item) => sum + parseNumber(item.extCost), 0)
             .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>

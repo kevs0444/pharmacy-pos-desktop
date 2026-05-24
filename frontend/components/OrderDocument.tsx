@@ -1,16 +1,21 @@
 import { useState, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { cn } from "../lib/utils";
 import type { PurchaseOrderRecord } from "../../backend/types/domain";
-import { OrderLineItemGrid, emptyLineItem } from "./OrderLineItemGrid";
+import { OrderLineItemGrid, emptyLineItem, parseNumber } from "./OrderLineItemGrid";
 import type { LineItem } from "./OrderLineItemGrid";
-import { Clock, Truck, CheckCircle, X as XIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, Truck, CheckCircle, X as XIcon } from "lucide-react";
+import { DEFAULT_ORDER_UNIT, formatFiveDigitStockNo, toOrderUpper, toTrimmedOrderUpper } from "../lib/orderFormatting";
+import type { NotificationInput } from "./ui/NotificationCenter";
+import { getErrorMessage } from "./ui/NotificationCenter";
 
 interface OrderDocumentProps {
   order: PurchaseOrderRecord | null;
   manufacturers: { id: number; name: string; contactPerson: string | null; email: string | null; phone: string | null }[];
   isNew?: boolean;
-  onSave?: (order: PurchaseOrderRecord) => void;
+  onSave?: () => void | Promise<void>;
   onNavigate?: (dir: "first"|"prev"|"next"|"last") => void;
+  onNotify?: (notification: NotificationInput) => void;
+  isLocked?: boolean;
 }
 
 const STATUS_BADGE: Record<string, { label: string; cls: string; icon: any }> = {
@@ -30,41 +35,46 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   manufacturers, 
   isNew = false,
   onNavigate,
-  onSave
+  onSave,
+  onNotify,
+  isLocked = false
 }, ref) => {
   // Local editable state seeded from the selected order
   const [docNo, setDocNo] = useState("");
   const [orderDate, setOrderDate] = useState("");
   const [orderedBy, setOrderedBy] = useState("");
   const [supplier, setSupplier] = useState("");
+
   const [notedBy, setNotedBy] = useState("");
   const [approvedBy, setApprovedBy] = useState("");
   const [termsDays, setTermsDays] = useState("30");
   const [payDueDate, setPayDueDate] = useState("");
-  const [qtyToOrder, setQtyToOrder] = useState("1 week");
+  const [qtyToOrder, setQtyToOrder] = useState("1 WEEK");
   const [remarks, setRemarks] = useState("");
   const [faxEmailRemarks, setFaxEmailRemarks] = useState("");
   const [priority, setPriority] = useState("Normal");
   const [status, setStatus] = useState("Processing");
-  const [isLocked, setIsLocked] = useState(false);
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem(0)]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
 
   // Supplier contact info (derived from selected manufacturer)
   const supplierInfo = useMemo(() => {
-    const mfg = manufacturers.find((m) => m.name === supplier);
+    const normalizedSupplier = toTrimmedOrderUpper(supplier);
+    const mfg = manufacturers.find((m) => toTrimmedOrderUpper(m.name) === normalizedSupplier);
     return {
-      contactPerson: mfg?.contactPerson || "",
-      phone: mfg?.phone || "",
+      contactPerson: toOrderUpper(mfg?.contactPerson || ""),
+      phone: toOrderUpper(mfg?.phone || ""),
       email: mfg?.email || "",
     };
   }, [manufacturers, supplier]);
 
   // Computed totals
+
+  // Computed totals
   const computedTotals = useMemo(() => {
     const itemCount = lineItems.filter((i) => i.stockName || i.quantity).length;
-    const totalOrder = lineItems.reduce((s, i) => s + (parseFloat(i.extCost) || 0), 0);
+    const totalOrder = lineItems.reduce((s, i) => s + parseNumber(i.extCost), 0);
     return { itemCount, totalOrder, totalReceived: 0 };
   }, [lineItems]);
 
@@ -72,37 +82,39 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   useEffect(() => {
     if (!order) {
       // New order mode
-      setDocNo("");
-      setOrderDate(new Date().toISOString().slice(0, 10));
-      setOrderedBy("");
+      const now = new Date();
+      const ms = Date.now().toString().slice(-6);
+      const generatedDocNo = `PO-${now.getFullYear()}-${ms}`;
+      setDocNo(generatedDocNo);
+      setOrderDate(now.toISOString().slice(0, 10));
+      setOrderedBy("CHA");
       setSupplier("");
       setNotedBy("");
       setApprovedBy("");
       setTermsDays("30");
       setPayDueDate("");
-      setQtyToOrder("1 week");
+      setQtyToOrder("1 WEEK");
       setRemarks("");
       setFaxEmailRemarks("");
       setPriority("Normal");
       setStatus("Processing");
-      setIsLocked(false);
       setLineItems([emptyLineItem(0)]);
       return;
     }
 
-    setDocNo(order.orderCode);
+    setDocNo(toTrimmedOrderUpper(order.orderCode));
     setOrderDate(order.placedDate);
-    setOrderedBy(order.orderedByName || "CHA");
-    setSupplier(order.manufacturerName);
-    setNotedBy(order.notedBy || "");
-    setApprovedBy(order.approvedBy || "");
+    setOrderedBy(toTrimmedOrderUpper(order.orderedByName || "CHA"));
+    setSupplier(toTrimmedOrderUpper(order.manufacturerName));
+    setNotedBy(toTrimmedOrderUpper(order.notedBy || ""));
+    setApprovedBy(toTrimmedOrderUpper(order.approvedBy || ""));
     setTermsDays(order.termsDays?.toString() || "30");
-    setQtyToOrder(order.qtyToOrder || "1 week");
-    setRemarks(order.remarks || "");
-    setFaxEmailRemarks(order.faxEmailRemarks || "");
+    setQtyToOrder(toTrimmedOrderUpper(order.qtyToOrder || "1 WEEK"));
+    setRemarks(toOrderUpper(order.remarks || ""));
+    setFaxEmailRemarks(toOrderUpper(order.faxEmailRemarks || ""));
+
     setPriority(order.priority);
     setStatus(order.status);
-    setIsLocked(order.isLocked || order.status === "Delivered" || order.status === "Cancelled");
 
     if (order.payDueDate) {
       setPayDueDate(order.payDueDate);
@@ -124,10 +136,11 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
         if (dbItems.length > 0) {
           const mapped: LineItem[] = dbItems.map((item, idx) => ({
             id: item.id,
+            productId: item.productId,
             rowIndex: idx,
-            stockNo: item.stockNo || String(idx + 1),
-            stockName: item.stockName,
-            orderUnit: item.orderUnit || "",
+            stockNo: formatFiveDigitStockNo(item.stockNo, idx + 1),
+            stockName: toTrimmedOrderUpper(item.stockName),
+            orderUnit: toTrimmedOrderUpper(item.orderUnit) || DEFAULT_ORDER_UNIT,
             pkgQty: item.pkgQty ? String(item.pkgQty) : "",
             quantity: String(item.quantity),
             unitCost: item.unitCost > 0 ? item.unitCost.toFixed(2) : "",
@@ -135,8 +148,8 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
             netUcost: item.netUCost > 0 ? item.netUCost.toFixed(2) : "",
             extCost: item.extCost > 0 ? item.extCost.toFixed(2) : "",
             received: item.recvd > 0 ? String(item.recvd) : "",
-            prNumber: item.prNum || "",
-            remarks: item.remarks || "",
+            prNumber: toTrimmedOrderUpper(item.prNum || ""),
+            remarks: toOrderUpper(item.remarks || ""),
           }));
           mapped.push(emptyLineItem(mapped.length));
           setLineItems(mapped);
@@ -145,63 +158,104 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
         }
       } catch (e: any) {
         console.error("Failed to load order items:", e);
+        onNotify?.({
+          variant: "error",
+          title: "Order items failed to load",
+          message: getErrorMessage(e, "Unable to load the spreadsheet rows for this order."),
+          source: "backend",
+        });
         setLineItems([emptyLineItem(0)]);
       } finally {
         setIsLoadingItems(false);
       }
     }
     loadItems();
-  }, [order]);
+  }, [order, onNotify]);
 
   useImperativeHandle(ref, () => ({
     save: async () => {
       // Find manufacturer ID from name
-      const mfg = manufacturers.find(m => m.name === supplier);
+      const mfg = manufacturers.find(m => toTrimmedOrderUpper(m.name) === toTrimmedOrderUpper(supplier));
       const mfgId = mfg ? mfg.id : null;
+      const savedItems = lineItems.filter(i => i.stockName || parseNumber(i.quantity) > 0);
+
+      if (!toTrimmedOrderUpper(supplier)) {
+        onNotify?.({
+          variant: "warning",
+          title: "Supplier required",
+          message: "Select a supplier before posting this order.",
+          source: "frontend",
+        });
+        return;
+      }
+
+      if (savedItems.length === 0) {
+        onNotify?.({
+          variant: "warning",
+          title: "No order items",
+          message: "Add at least one spreadsheet line item before posting.",
+          source: "frontend",
+        });
+        return;
+      }
       
       const payload = {
         id: order?.id,
+        orderCode: toTrimmedOrderUpper(docNo) || undefined,
         manufacturerId: mfgId,
-        manufacturerName: supplier,
+        manufacturerName: toTrimmedOrderUpper(supplier),
         contactPerson: supplierInfo.contactPerson,
         total: computedTotals.totalOrder,
         status: status as any,
         etaDate: null,
         placedDate: orderDate,
         priority: priority as any,
-        orderedByName: orderedBy,
-        remarks: remarks || null,
-        faxEmailRemarks: faxEmailRemarks || null,
-        notedBy: notedBy || null,
-        approvedBy: approvedBy || null,
+        orderedByName: toTrimmedOrderUpper(orderedBy) || null,
+        remarks: toTrimmedOrderUpper(remarks) || null,
+        faxEmailRemarks: toTrimmedOrderUpper(faxEmailRemarks) || null,
+        notedBy: toTrimmedOrderUpper(notedBy) || null,
+        approvedBy: toTrimmedOrderUpper(approvedBy) || null,
         qtyToOrder: qtyToOrder || null,
         termsDays: parseInt(termsDays, 10) || 30,
         payDueDate: payDueDate || null,
-        items: lineItems
-          .filter(i => i.stockName || parseFloat(i.quantity) > 0)
-          .map(i => ({
-            productId: null,
-            stockNo: i.stockNo || null,
-            stockName: i.stockName,
-            orderUnit: i.orderUnit || null,
-            pkgQty: parseFloat(i.pkgQty) || 1,
-            quantity: parseFloat(i.quantity) || 0,
-            unitCost: parseFloat(i.unitCost) || 0,
-            discPercent: parseFloat(i.discPercent) || 0,
-            netUCost: parseFloat(i.netUcost) || 0,
-            extCost: parseFloat(i.extCost) || 0,
-            prNum: i.prNumber || null,
-            remarks: i.remarks || null
+        sysGen: false,
+        isClosed: false,
+        isLocked,
+        items: savedItems
+          .map((i, idx) => ({
+            productId: i.productId ?? null,
+            stockNo: formatFiveDigitStockNo(i.stockNo, idx + 1) || null,
+            stockName: toTrimmedOrderUpper(i.stockName),
+            orderUnit: toTrimmedOrderUpper(i.orderUnit) || DEFAULT_ORDER_UNIT,
+            pkgQty: parseNumber(i.pkgQty) || 1,
+            quantity: parseNumber(i.quantity) || 1,
+            unitCost: parseNumber(i.unitCost) || 0,
+            discPercent: parseNumber(i.discPercent) || 0,
+            netUCost: parseNumber(i.netUcost) || 0,
+            extCost: parseNumber(i.extCost) || 0,
+            recvd: parseNumber(i.received) || 0,
+            prNum: toTrimmedOrderUpper(i.prNumber) || null,
+            remarks: toTrimmedOrderUpper(i.remarks) || null
           }))
       };
 
       try {
         await window.api.orders.save(payload);
-        if (onSave) onSave(payload as any);
-        alert("Order saved successfully!");
+        if (onSave) await onSave();
+        onNotify?.({
+          variant: "success",
+          title: "Order saved",
+          message: "The purchase order spreadsheet was posted successfully.",
+          source: "system",
+        });
       } catch (err) {
         console.error("Failed to save order:", err);
-        alert("Failed to save order. Check console for details.");
+        onNotify?.({
+          variant: "error",
+          title: "Order save failed",
+          message: getErrorMessage(err, "Unable to save this purchase order."),
+          source: "backend",
+        });
       }
     }
   }));
@@ -224,7 +278,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
       {/* ── Document Header ── */}
       <div className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between mb-3">
@@ -260,7 +314,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
                 <span className="opacity-50">•</span>
                 <span>{orderDate}</span>
                 <span className="opacity-50">•</span>
-                <span><span className="opacity-60 mr-1">Supplier:</span> <span className="text-brand-blue">{supplier || "Not selected"}</span></span>
+                <span><span className="opacity-60 mr-1">Supplier:</span> <span className="text-brand-blue">{supplier || "NOT SELECTED"}</span></span>
                 <span className="opacity-50">•</span>
                 <span><span className="opacity-60 mr-1">Total:</span> <span className="text-emerald-600">₱{(computedTotals.totalOrder || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
                 <span className="opacity-50">•</span>
@@ -295,75 +349,77 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
             </div>
             
             <div className="flex items-center gap-1 mt-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Doc No</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2">Doc No</label>
               <input type="text" value={docNo || ""} readOnly className="flex-1 w-full px-2 py-0.5 text-xs font-bold text-slate-800 outline-none bg-white border border-slate-300 rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all" />
             </div>
             
             <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Order Date</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2">Order Date</label>
                <input type="date" value={orderDate || ""} onChange={(e) => setOrderDate(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700" />
             </div>
 
             <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Ordered By</label>
-               <select value={orderedBy || ""} onChange={(e) => setOrderedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2">Ordered By</label>
+               <select value={orderedBy || ""} onChange={(e) => setOrderedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase">
                   <option value="CHA">CHA</option>
-                  <option value="System Administrator">System Administrator</option>
-                  <option value="Branch Manager">Branch Manager</option>
+                  <option value="SYSTEM ADMINISTRATOR">SYSTEM ADMINISTRATOR</option>
+                  <option value="BRANCH MANAGER">BRANCH MANAGER</option>
                </select>
             </div>
 
             <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Supplier</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2">Supplier</label>
                <div className="flex items-center gap-2 flex-1 w-full">
-                 <select value={supplier || ""} onChange={(e) => setSupplier(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
-                    <option value="">Select...</option>
+                 <select value={supplier || ""} onChange={(e) => setSupplier(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase">
+                    <option value="">SELECT...</option>
                     <option value="01-MAIN">01-MAIN</option>
-                    {manufacturers.filter(m => m.name !== "01-MAIN").map((m) => <option key={m.id} value={m.name}>{m.name}</option>)}
+                    {manufacturers.filter(m => toTrimmedOrderUpper(m.name) !== "01-MAIN").map((m) => (
+                      <option key={m.id} value={toTrimmedOrderUpper(m.name)}>{toOrderUpper(m.name)}</option>
+                    ))}
                  </select>
-                 <span className="text-[10px] font-semibold text-emerald-600 truncate">{supplier === "01-MAIN" ? "Main warehouse" : ""}</span>
+                 <span className="text-[10px] font-semibold text-emerald-600 truncate">{supplier === "01-MAIN" ? "MAIN WAREHOUSE" : ""}</span>
                </div>
             </div>
 
             <div className="flex items-start gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2 mt-1">Remarks</label>
-               <textarea value={remarks || ""} onChange={(e) => setRemarks(e.target.value)} rows={2} className="flex-1 w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white resize-none outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2 mt-1">Remarks</label>
+               <textarea value={remarks || ""} onChange={(e) => setRemarks(toOrderUpper(e.target.value))} rows={2} className="flex-1 w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white resize-none outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase" />
             </div>
 
             <div className="flex items-start gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2 mt-1 leading-tight">Fax / Email<br/>remarks</label>
-               <textarea value={faxEmailRemarks || ""} onChange={(e) => setFaxEmailRemarks(e.target.value)} rows={2} className="flex-1 w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white resize-none outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-left pr-2 mt-1 leading-tight">Fax / Email<br/>remarks</label>
+               <textarea value={faxEmailRemarks || ""} onChange={(e) => setFaxEmailRemarks(toOrderUpper(e.target.value))} rows={2} className="flex-1 w-full px-2 py-1 text-xs border border-slate-300 rounded bg-white resize-none outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase" />
             </div>
           </div>
 
           {/* Column 2: Approvals */}
-          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
+          <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative flex flex-col h-full pt-4">
             <div className="absolute -top-[10px] left-3 bg-white px-1.5">
               <span className="text-[9px] font-extrabold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">Approvals & Workflow</span>
             </div>
              
              <div className="flex items-center gap-1 mt-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Noted By</label>
-               <select value={notedBy || ""} onChange={(e) => setNotedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Noted By</label>
+               <select value={notedBy || ""} onChange={(e) => setNotedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase">
                  <option value=""></option>
-                 <option value="Branch Manager">Branch Manager</option>
-                 <option value="System Administrator">System Administrator</option>
+                 <option value="BRANCH MANAGER">BRANCH MANAGER</option>
+                 <option value="SYSTEM ADMINISTRATOR">SYSTEM ADMINISTRATOR</option>
                </select>
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Approved By</label>
-               <select value={approvedBy || ""} onChange={(e) => setApprovedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Approved By</label>
+               <select value={approvedBy || ""} onChange={(e) => setApprovedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase">
                  <option value=""></option>
-                 <option value="System Administrator">System Administrator</option>
-                 <option value="Branch Manager">Branch Manager</option>
+                 <option value="SYSTEM ADMINISTRATOR">SYSTEM ADMINISTRATOR</option>
+                 <option value="BRANCH MANAGER">BRANCH MANAGER</option>
                </select>
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">QtyToOrder</label>
-               <select value={qtyToOrder || ""} onChange={(e) => setQtyToOrder(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
-                  <option value="1 week">1 week</option>
-                  <option value="2 weeks">2 weeks</option>
-                  <option value="1 month">1 month</option>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">QtyToOrder</label>
+               <select value={qtyToOrder || ""} onChange={(e) => setQtyToOrder(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700 uppercase">
+                  <option value="1 WEEK">1 WEEK</option>
+                  <option value="2 WEEKS">2 WEEKS</option>
+                  <option value="1 MONTH">1 MONTH</option>
                </select>
              </div>
              <div className="flex items-center gap-1 ml-[79px] mt-1">
@@ -371,15 +427,12 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 ml-4">OTHER</span>
              </div>
              <div className="flex items-center gap-2 mt-2">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">SysGen?</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">SysGen?</label>
                <input type="checkbox" className="w-3.5 h-3.5 border-slate-300 text-blue-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer transition-shadow" />
              </div>
-             <div className="flex items-start gap-2 mt-3 ml-[79px]">
+             <div className="flex gap-2 mt-auto justify-end pt-2">
                <button className="flex items-center justify-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95 bg-[#2b4c7e] hover:bg-[#1e3a63] text-center leading-tight">Email to<br/>supplier</button>
-               <div className="flex flex-col items-center">
-                 <button className="flex items-center justify-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95 bg-[#2b4c7e] hover:bg-[#1e3a63] text-center leading-tight">Send to<br/>Cloud</button>
-                 <span className="text-[9px] font-bold text-blue-800 bg-blue-100 px-4 py-0.5 rounded-full mt-1.5 shadow-sm border border-blue-200">0</span>
-               </div>
+               <button className="flex items-center justify-center px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded shadow-sm text-white transition-transform active:scale-95 bg-[#2b4c7e] hover:bg-[#1e3a63] text-center leading-tight">Send to<br/>Cloud</button>
              </div>
           </div>
 
@@ -390,7 +443,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
              </div>
              
              <div className="flex items-center gap-1 mt-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Terms (days)</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Terms (days)</label>
                <select value={termsDays || "30"} onChange={(e) => setTermsDays(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white text-center outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
                  <option value="7">7</option>
                  <option value="15">15</option>
@@ -401,39 +454,39 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
                </select>
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Pay Due Date</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Pay Due Date</label>
                <input type="date" value={payDueDate || ""} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 outline-none text-slate-600" />
              </div>
              <div className="flex items-center gap-2">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Closed</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Closed</label>
                <input type="checkbox" className="w-3.5 h-3.5 border-slate-300 text-blue-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer transition-shadow" />
              </div>
              <div className="flex items-center gap-1 mt-2">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Item Cnt</label>
-               <input type="text" value={computedTotals.itemCount} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-100 text-slate-700 text-center outline-none font-bold" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Item Cnt</label>
+               <input type="text" value={computedTotals.itemCount} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-100 text-slate-700 text-right outline-none font-bold" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Total Order</label>
-               <input type="text" value={computedTotals.totalOrder.toFixed(2)} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-blue-50 text-blue-700 text-center outline-none font-bold" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Total Order</label>
+               <input type="text" value={computedTotals.totalOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-blue-50 text-blue-700 text-right outline-none font-bold" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Total Recvd</label>
-               <input type="text" value={computedTotals.totalReceived.toFixed(2)} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-emerald-50 text-emerald-700 text-center outline-none font-bold" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Total Recvd</label>
+               <input type="text" value={computedTotals.totalReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-emerald-50 text-emerald-700 text-right outline-none font-bold" />
              </div>
              <div className="flex items-center gap-1 mt-2">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Contact</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Contact</label>
                <input type="text" value={supplierInfo.contactPerson || ""} readOnly className="flex-1 px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Phone</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Phone</label>
                <input type="text" value={supplierInfo.phone || ""} readOnly className="flex-1 px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Fax</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Fax</label>
                <input type="text" value="" readOnly className="flex-1 px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Email</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-left pr-2">Email</label>
                <input type="text" value={supplierInfo.email || ""} readOnly className="flex-1 px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-blue-600 outline-none font-medium truncate hover:underline cursor-pointer" />
              </div>
           </div>
@@ -445,27 +498,23 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
              </div>
              
              <div className="flex items-center gap-1 mt-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-right pr-2">Amount</label>
-               <input type="text" value={computedTotals.totalOrder.toFixed(2)} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 text-right font-mono outline-none font-medium" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-left pr-2">Amount</label>
+               <input type="text" value={computedTotals.totalOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 text-right font-mono outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-right pr-2">Item Disc</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-left pr-2">Item Disc</label>
                <input type="text" value="0.00" readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 text-right font-mono outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-right pr-2">Addl Disc</label>
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-left pr-2">Addl Disc</label>
                <input type="text" value="0.00" readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-slate-50 text-slate-700 text-right font-mono outline-none font-medium" />
              </div>
              <div className="flex items-center gap-1 mt-1">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-right pr-2">Net Amt</label>
-               <input type="text" value={computedTotals.totalOrder.toFixed(2)} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-blue-50 text-blue-700 text-right font-mono outline-none font-bold" />
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[70px] text-left pr-2">Net Amt</label>
+               <input type="text" value={computedTotals.totalOrder.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} readOnly className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-200 rounded bg-blue-50 text-blue-700 text-right font-mono outline-none font-bold" />
              </div>
              
              <div className="mt-auto flex flex-col gap-2 pl-[74px]">
-               <div className="flex items-center gap-2">
-                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Lock</label>
-                 <input type="checkbox" checked={isLocked} onChange={() => setIsLocked(!isLocked)} className="w-3.5 h-3.5 border-slate-300 text-blue-600 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer transition-shadow" />
-               </div>
                <div className="text-[9px] text-slate-400 font-bold mt-2">
                  Created: {orderDate ? `${orderDate} 17:04:02` : "—"}
                </div>
@@ -476,7 +525,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
       </div>
 
       {/* ── Line Items Grid ── */}
-      <div className="flex-1 overflow-hidden p-4 bg-slate-50 flex flex-col min-h-0">
+      <div className="flex-1 p-4 bg-slate-50 flex flex-col min-h-[400px]">
         <div className="mb-2 flex items-center justify-between shrink-0">
           <p className="text-[10px] text-slate-400 font-medium">
             💡 Type in the <strong>Stock Name</strong> column to search and select items from inventory.
@@ -489,6 +538,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
           onItemsChange={setLineItems}
           readOnly={isLocked}
           isLoading={isLoadingItems}
+          onNotify={onNotify}
         />
         </div>
       </div>

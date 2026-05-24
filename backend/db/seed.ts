@@ -89,7 +89,7 @@ function generateMockPurchaseOrders() {
       
       items.push({
         stockName: `${pref}${suff} ${dose}mg Tablet`,
-        orderUnit: 'boxes',
+        orderUnit: 'EACH',
         pkgQty: 1,
         quantity,
         unitCost,
@@ -164,6 +164,7 @@ export function seedDatabase(db: Database.Database): void {
     seedReceiptSettings(db)
     seedAppSettings(db)
     seedPurchaseOrders(db)
+    normalizeSeedPurchaseOrderUnits(db)
   })
 
   seed()
@@ -762,4 +763,27 @@ function seedPurchaseOrders(db: Database.Database): void {
       })
     }
   }
+}
+
+function normalizeSeedPurchaseOrderUnits(db: Database.Database): void {
+  db.prepare(`
+    UPDATE purchase_order_items
+    SET order_unit = 'EACH'
+    WHERE purchase_order_id IN (
+      SELECT id
+      FROM purchase_orders
+      WHERE order_code LIKE 'PO-%-MOCK%'
+    )
+      AND (
+        order_unit IS NULL
+        OR TRIM(order_unit) = ''
+        OR UPPER(order_unit) IN (
+          'BOX', 'BOXES',
+          'BOTTLE', 'BOTTLES',
+          'PACK', 'PACKS',
+          'CARTON', 'CARTONS',
+          'BLISTER', 'BLISTERS'
+        )
+      )
+  `).run()
 }

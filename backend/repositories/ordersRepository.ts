@@ -3,6 +3,12 @@ import type { OrderListQuery, PaginatedResult } from '../types/api'
 import type { OrderStatus, PurchaseOrderItemRecord, PurchaseOrderRecord } from '../types/domain'
 import { buildPaginatedResult, escapeLike, normalizePagination } from './helpers'
 
+type PurchaseOrderRow = Omit<PurchaseOrderRecord, 'sysGen' | 'isClosed' | 'isLocked'> & {
+  sysGen: number
+  isClosed: number
+  isLocked: number
+}
+
 export class OrdersRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -56,7 +62,7 @@ export class OrdersRepository {
       .prepare(`SELECT COUNT(*) AS count ${joinsSql} ${whereSql}`)
       .get(params) as { count: number }
 
-    const items = this.db
+    const rows = this.db
       .prepare(`
         SELECT
           po.id,
@@ -72,6 +78,20 @@ export class OrdersRepository {
           po.ordered_by_user_id AS orderedByUserId,
           COALESCE(po.ordered_by_name, u.full_name) AS orderedByName,
           po.remarks,
+          po.fax_email_remarks AS faxEmailRemarks,
+          po.noted_by AS notedBy,
+          po.approved_by AS approvedBy,
+          po.qty_to_order AS qtyToOrder,
+          po.sys_gen AS sysGen,
+          po.terms_days AS termsDays,
+          po.pay_due_date AS payDueDate,
+          po.is_closed AS isClosed,
+          po.is_locked AS isLocked,
+          (
+            SELECT COUNT(*)
+            FROM purchase_order_items poi_count
+            WHERE poi_count.purchase_order_id = po.id
+          ) AS itemCount,
           po.created_at AS createdAt,
           po.updated_at AS updatedAt
         ${joinsSql}
@@ -79,7 +99,14 @@ export class OrdersRepository {
         ORDER BY po.placed_date ${sortOrder}, po.id ${sortOrder}
         LIMIT @limit OFFSET @offset
       `)
-      .all(params) as PurchaseOrderRecord[]
+      .all(params) as PurchaseOrderRow[]
+
+    const items = rows.map((row) => ({
+      ...row,
+      sysGen: Boolean(row.sysGen),
+      isClosed: Boolean(row.isClosed),
+      isLocked: Boolean(row.isLocked),
+    }))
 
     return buildPaginatedResult(items, totalRow.count, page, pageSize)
   }
@@ -125,6 +152,23 @@ export class OrdersRepository {
     
     this.db.transaction(() => {
       let orderId = order.id
+      const orderParams = {
+        ...order,
+        manufacturerId: order.manufacturerId ?? null,
+        contactPerson: order.contactPerson ?? null,
+        etaDate: order.etaDate ?? null,
+        orderedByUserId: order.orderedByUserId ?? null,
+        orderedByName: order.orderedByName ?? null,
+        remarks: order.remarks ?? null,
+        faxEmailRemarks: order.faxEmailRemarks ?? null,
+        notedBy: order.notedBy ?? null,
+        approvedBy: order.approvedBy ?? null,
+        qtyToOrder: order.qtyToOrder ?? null,
+        payDueDate: order.payDueDate ?? null,
+        sysGen: order.sysGen ? 1 : 0,
+        isClosed: order.isClosed ? 1 : 0,
+        isLocked: order.isLocked ? 1 : 0,
+      }
       
       if (orderId) {
         // Update existing
@@ -136,7 +180,10 @@ export class OrdersRepository {
             total = @total,
             status = @status,
             eta_date = @etaDate,
+            placed_date = @placedDate,
             priority = @priority,
+            ordered_by_user_id = @orderedByUserId,
+            ordered_by_name = @orderedByName,
             remarks = @remarks,
             fax_email_remarks = @faxEmailRemarks,
             noted_by = @notedBy,
@@ -144,10 +191,13 @@ export class OrdersRepository {
             qty_to_order = @qtyToOrder,
             terms_days = @termsDays,
             pay_due_date = @payDueDate,
+            sys_gen = @sysGen,
+            is_closed = @isClosed,
+            is_locked = @isLocked,
             updated_at = @updatedAt
           WHERE id = @id
         `).run({
-          ...order,
+          ...orderParams,
           updatedAt: timestamp
         })
         
@@ -168,16 +218,18 @@ export class OrdersRepository {
             total, status, eta_date, placed_date, priority,
             ordered_by_user_id, ordered_by_name, remarks, fax_email_remarks,
             noted_by, approved_by, qty_to_order, terms_days, pay_due_date,
+            sys_gen, is_closed, is_locked,
             created_at, updated_at
           ) VALUES (
             @orderCode, @manufacturerId, @manufacturerName, @contactPerson,
             @total, @status, @etaDate, @placedDate, @priority,
             @orderedByUserId, @orderedByName, @remarks, @faxEmailRemarks,
             @notedBy, @approvedBy, @qtyToOrder, @termsDays, @payDueDate,
+            @sysGen, @isClosed, @isLocked,
             @createdAt, @updatedAt
           )
         `).run({
-          ...order,
+          ...orderParams,
           orderCode,
           placedDate: order.placedDate || timestamp.split('T')[0],
           createdAt: timestamp,
@@ -203,6 +255,11 @@ export class OrdersRepository {
         insertItem.run({
           ...item,
           purchaseOrderId: orderId,
+          productId: item.productId ?? null,
+          stockNo: item.stockNo ?? null,
+          orderUnit: item.orderUnit ?? 'EACH',
+          prNum: item.prNum ?? null,
+          remarks: item.remarks ?? null,
           recvd: item.recvd || 0,
           pkgQty: item.pkgQty || 1
         })

@@ -3,8 +3,10 @@ import { cn } from "../lib/utils";
 import type { OrderDocumentRef } from "./OrderDocument";
 import { OrderDocument } from "./OrderDocument";
 import { PageHeader } from "./ui/PageHeader";
+import { NotificationCenter, getErrorMessage, useNotificationQueue } from "./ui/NotificationCenter";
+import { toOrderUpper, toTrimmedOrderUpper } from "../lib/orderFormatting";
 import {
-  Search, Plus, RotateCcw, Trash2, Send, Package, Printer, Mail,
+  Search, Plus, RotateCcw, Trash2, Send, Package, Printer, Mail, Lock, Unlock,
   ChevronLeft, ChevronRight, FileText,
 } from "lucide-react";
 import type { PurchaseOrderRecord, ManufacturerRecord, OrderStatus } from "../../backend/types/domain";
@@ -25,6 +27,26 @@ function formatCurrentDateTime(): string {
 }
 
 // ─── Toolbar Button ───────────────────────────────────────────────────────────
+function nullableOrderUpper(value: string | null | undefined): string | null {
+  const normalized = toTrimmedOrderUpper(value);
+  return normalized || null;
+}
+
+function normalizeOrderText(order: PurchaseOrderRecord): PurchaseOrderRecord {
+  return {
+    ...order,
+    orderCode: toTrimmedOrderUpper(order.orderCode),
+    manufacturerName: toTrimmedOrderUpper(order.manufacturerName),
+    contactPerson: nullableOrderUpper(order.contactPerson),
+    orderedByName: nullableOrderUpper(order.orderedByName),
+    remarks: nullableOrderUpper(order.remarks),
+    faxEmailRemarks: nullableOrderUpper(order.faxEmailRemarks),
+    notedBy: nullableOrderUpper(order.notedBy),
+    approvedBy: nullableOrderUpper(order.approvedBy),
+    qtyToOrder: nullableOrderUpper(order.qtyToOrder),
+  };
+}
+
 function TBtn({ children, onClick, color = "slate" }: { children: React.ReactNode; onClick?: () => void; color?: "blue"|"green"|"amber"|"red"|"indigo"|"slate"|"purple" }) {
   const cls: Record<string, string> = {
     blue:   "bg-brand-blue hover:bg-blue-700 text-white",
@@ -38,7 +60,7 @@ function TBtn({ children, onClick, color = "slate" }: { children: React.ReactNod
   return (
     <button
       onClick={onClick}
-      className={cn("flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95", cls[color])}
+      className={cn("flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wide rounded-lg shadow-sm transition-all active:scale-95", cls[color])}
     >
       {children}
     </button>
@@ -59,6 +81,18 @@ export function Orders() {
   const [periodFilter, setPeriodFilter] = useState(() => new Date().toISOString().slice(0, 7));
   const docRef = useRef<OrderDocumentRef>(null);
   const [currentTime, setCurrentTime] = useState(formatCurrentDateTime());
+  const { notifications, notify, dismissNotification } = useNotificationQueue();
+  const [isLocked, setIsLocked] = useState(false);
+
+  const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedOrderId) || null, [orders, selectedOrderId]);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      setIsLocked(selectedOrder.isLocked || selectedOrder.status === "Delivered" || selectedOrder.status === "Cancelled");
+    } else {
+      setIsLocked(false);
+    }
+  }, [selectedOrder]);
 
   // Search autocomplete state
   const [searchInput, setSearchInput] = useState("");
@@ -78,9 +112,17 @@ export function Orders() {
       return;
     }
     window.api.orders.list({ page: 1, pageSize: 10, search: debouncedSearch })
-      .then(res => setSearchOptions(res.items))
-      .catch(console.error);
-  }, [debouncedSearch]);
+      .then(res => setSearchOptions(res.items.map(normalizeOrderText)))
+      .catch((e) => {
+        console.error("Failed to search orders:", e);
+        notify({
+          variant: "error",
+          title: "Order search failed",
+          message: getErrorMessage(e, "Unable to search purchase orders."),
+          source: "backend",
+        });
+      });
+  }, [debouncedSearch, notify]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -110,15 +152,16 @@ export function Orders() {
         }),
         window.api.admin.listManufacturers(),
       ]);
-      setOrders(orderResult.items);
+      const normalizedOrders = orderResult.items.map(normalizeOrderText);
+      setOrders(normalizedOrders);
       setManufacturers(mfgResult);
       setTotalPages(orderResult.totalPages || 1);
       setTotalCount(orderResult.total || 0);
       
       setSelectedOrderId((currentSelectedId) => {
-        if (orderResult.items.length > 0) {
-          if (currentSelectedId === null || !orderResult.items.find(o => o.id === currentSelectedId)) {
-            return orderResult.items[0].id;
+        if (normalizedOrders.length > 0) {
+          if (currentSelectedId === null || !normalizedOrders.find(o => o.id === currentSelectedId)) {
+            return normalizedOrders[0].id;
           }
           return currentSelectedId;
         }
@@ -126,16 +169,20 @@ export function Orders() {
       });
     } catch (e: any) {
       console.error("Failed to load Orders:", e);
+      notify({
+        variant: "error",
+        title: "Orders failed to load",
+        message: getErrorMessage(e, "Unable to load purchase orders."),
+        source: "backend",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchQuery, filterStatus, periodFilter]);
+  }, [currentPage, searchQuery, filterStatus, periodFilter, notify]);
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
   const filteredOrders = orders;
-
-  const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedOrderId) || null, [orders, selectedOrderId]);
 
   const currentRecordIdx = useMemo(() => {
     if (!selectedOrderId) return -1;
@@ -179,7 +226,19 @@ export function Orders() {
     if (target) { setSelectedOrderId(target.id); setSearchQuery(""); setFilterStatus("All"); setGotoPoNumber(""); }
   }, [gotoPoNumber, orders]);
 
-  const handlePost = () => { if (docRef.current) docRef.current.save(); };
+  const handlePost = async () => {
+    if (!docRef.current) {
+      notify({
+        variant: "warning",
+        title: "No order document",
+        message: "Open or create an order before posting.",
+        source: "frontend",
+      });
+      return;
+    }
+
+    await docRef.current.save();
+  };
 
   const handleDelete = useCallback(async () => {
     if (!selectedOrderId) return;
@@ -189,16 +248,32 @@ export function Orders() {
       await window.api.orders.delete(selectedOrderId);
       setSelectedOrderId(null);
       await loadOrders();
+      notify({
+        variant: "success",
+        title: "Order deleted",
+        message: `${toOrderUpper(selectedOrder?.orderCode || "ORDER")} was removed.`,
+        source: "system",
+      });
     } catch (e: any) {
       console.error("Failed to delete order:", e);
-      alert("Failed to delete order.");
+      notify({
+        variant: "error",
+        title: "Delete failed",
+        message: getErrorMessage(e, "Unable to delete this purchase order."),
+        source: "backend",
+      });
     }
-  }, [selectedOrderId, selectedOrder]);
+  }, [selectedOrderId, selectedOrder, loadOrders, notify]);
 
   const handleReceive = useCallback(async () => {
     if (!selectedOrderId || !selectedOrder) return;
     if (selectedOrder.status === "Delivered" || selectedOrder.status === "Cancelled") {
-      alert(`Cannot receive an order that is already ${selectedOrder.status}.`);
+      notify({
+        variant: "warning",
+        title: "Receive blocked",
+        message: `Cannot receive an order that is already ${toOrderUpper(selectedOrder.status)}.`,
+        source: "frontend",
+      });
       return;
     }
     const nextStatus = selectedOrder.status === "Processing" ? "In Transit" : "Delivered";
@@ -207,11 +282,22 @@ export function Orders() {
     try {
       await window.api.orders.updateStatus(selectedOrderId, nextStatus as any);
       await loadOrders();
+      notify({
+        variant: "success",
+        title: "Order status updated",
+        message: `${selectedOrder.orderCode} is now ${toOrderUpper(nextStatus)}.`,
+        source: "system",
+      });
     } catch (e: any) {
       console.error("Failed to update status:", e);
-      alert("Failed to update order status.");
+      notify({
+        variant: "error",
+        title: "Status update failed",
+        message: getErrorMessage(e, "Unable to update this order status."),
+        source: "backend",
+      });
     }
-  }, [selectedOrderId, selectedOrder]);
+  }, [selectedOrderId, selectedOrder, loadOrders, notify]);
 
   const handleReset = () => {
     setSearchQuery(""); setSearchInput(""); setFilterStatus("All");
@@ -226,13 +312,14 @@ export function Orders() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 font-mono text-xs">
+      <NotificationCenter notifications={notifications} onDismiss={dismissNotification} />
 
       {/* ── Header ── */}
       <PageHeader userId="CHA" dateStr={currentTime}>
         <FileText className="w-4 h-4 text-slate-400" />
         <span className="text-xs font-bold tracking-widest uppercase text-slate-800">PO REGISTER</span>
         {selectedOrder && (
-          <span className="text-[10px] text-slate-400 font-medium ml-1">— {selectedOrder.manufacturerName}</span>
+          <span className="text-[10px] text-slate-400 font-medium ml-1">- {toOrderUpper(selectedOrder.manufacturerName)}</span>
         )}
       </PageHeader>
 
@@ -295,7 +382,7 @@ export function Orders() {
                       className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 flex items-center justify-between">
                     <div>
                       <div className="font-bold text-slate-700">{opt.orderCode}</div>
-                      <div className="text-[10px] text-slate-500 truncate">{opt.manufacturerName}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{toOrderUpper(opt.manufacturerName)}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] font-medium text-slate-600">{opt.placedDate}</div>
@@ -314,10 +401,22 @@ export function Orders() {
 
         {/* Navigate PO */}
         <div className="flex items-center gap-1.5">
-          <button onClick={() => navigateRecord("prev")} className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm">
+          <button
+            onClick={() => navigateRecord("prev")}
+            disabled={filteredOrders.length === 0 || (currentRecordIdx <= 0 && currentPage <= 1)}
+            title="Newer order"
+            aria-label="Go to newer order"
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30 disabled:hover:bg-white"
+          >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => navigateRecord("next")} className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm">
+          <button
+            onClick={() => navigateRecord("next")}
+            disabled={filteredOrders.length === 0 || (currentRecordIdx >= filteredOrders.length - 1 && currentPage >= totalPages)}
+            title="Older order"
+            aria-label="Go to older order"
+            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30 disabled:hover:bg-white"
+          >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -328,12 +427,12 @@ export function Orders() {
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Status</span>
           <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
-            className="h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none shadow-sm">
-            <option value="All">All</option>
-            <option value="Processing">Processing</option>
-            <option value="In Transit">In Transit</option>
-            <option value="Delivered">Delivered</option>
-            <option value="Cancelled">Cancelled</option>
+            className="h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none shadow-sm uppercase">
+            <option value="All">ALL</option>
+            <option value="Processing">PROCESSING</option>
+            <option value="In Transit">IN TRANSIT</option>
+            <option value="Delivered">DELIVERED</option>
+            <option value="Cancelled">CANCELLED</option>
           </select>
         </div>
 
@@ -342,7 +441,7 @@ export function Orders() {
         {/* Server-Side Pagination */}
         <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shadow-inner">
           <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
-            Pg {currentPage} / {totalPages} <span className="text-slate-400 font-normal">({totalCount})</span>
+            Page {currentPage} of {totalPages} <span className="text-slate-400 font-normal">({totalCount} items)</span>
           </span>
           <div className="flex items-center gap-0.5">
             <button 
@@ -370,6 +469,10 @@ export function Orders() {
         <TBtn onClick={handlePost} color="amber"><Send className="w-3 h-3"/>Post</TBtn>
         <TBtn onClick={handleDelete} color="red"><Trash2 className="w-3 h-3"/>Delete</TBtn>
         <TBtn onClick={handleReceive} color="indigo"><Package className="w-3 h-3"/>Receive</TBtn>
+        <TBtn onClick={() => setIsLocked(!isLocked)} color={isLocked ? "amber" : "green"}>
+          {isLocked ? <Unlock className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
+          {isLocked ? "Unlock" : "Lock"}
+        </TBtn>
         <TBtn color="slate"><Printer className="w-3 h-3"/>Print</TBtn>
         <TBtn color="purple"><Mail className="w-3 h-3"/>Email</TBtn>
 
@@ -390,17 +493,14 @@ export function Orders() {
           manufacturers={mfgForDocument}
           isNew={!selectedOrder}
           onNavigate={navigateRecord}
-          onSave={() => loadOrders()}
+          onSave={loadOrders}
+          onNotify={notify}
+          isLocked={isLocked}
         />
-      </div>
-
-      {/* ── Bottom Bar ── */}
-      <div className="border-t border-slate-200 bg-white shrink-0">
-        {/* Summary row */}
         <div className="flex items-center justify-between px-5 py-2 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-bold text-slate-500">
-              {selectedOrder ? `PO: ${selectedOrder.orderCode}` : "No order selected"}
+              {selectedOrder ? `PO: ${selectedOrder.orderCode}` : "NO ORDER SELECTED"}
             </span>
             {selectedOrder && (
               <span className={cn(
@@ -417,14 +517,14 @@ export function Orders() {
 
           <div className="flex items-center gap-6 text-center">
             {[
-              { label: "Supplier", value: selectedOrder?.manufacturerName || "—" },
-              { label: "Placed Date", value: selectedOrder?.placedDate || "—" },
-              { label: "Item Count", value: selectedOrder ? String(selectedOrder.itemCount ?? 0) : "—" },
-              { label: "Total Order", value: selectedOrder ? `₱${selectedOrder.total?.toFixed(2) ?? "0.00"}` : "—" },
+              { label: "Supplier", value: selectedOrder?.manufacturerName || "-" },
+              { label: "Placed Date", value: selectedOrder?.placedDate || "-" },
+              { label: "Item Count", value: selectedOrder ? String(selectedOrder.itemCount ?? 0) : "-" },
+              { label: "Total Order", value: selectedOrder ? `₱${selectedOrder.total?.toFixed(2) ?? "0.00"}` : "-" },
             ].map(({ label, value }) => (
               <div key={label} className="flex flex-col items-center">
                 <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">{label}</span>
-                <span className="text-[11px] font-bold text-slate-700">{value}</span>
+                <span className="text-[11px] font-bold text-slate-700 uppercase">{value}</span>
               </div>
             ))}
           </div>

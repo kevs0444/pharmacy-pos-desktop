@@ -137,7 +137,7 @@ app.whenReady().then(() => {
             productId: p.id,
             stockNo: p.code,
             stockName: p.name,
-            orderUnit: p.packaging_unit || 'EACH',
+            orderUnit: 'EACH',
             pkgQty: 1,
             quantity,
             unitCost: +unitCost.toFixed(2),

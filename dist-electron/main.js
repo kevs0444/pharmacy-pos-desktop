@@ -471,7 +471,7 @@ function generateMockPurchaseOrders() {
       const dose = [50, 100, 250, 500][Math.floor(Math.random() * 4)];
       items.push({
         stockName: `${pref}${suff} ${dose}mg Tablet`,
-        orderUnit: "boxes",
+        orderUnit: "EACH",
         pkgQty: 1,
         quantity,
         unitCost,
@@ -539,6 +539,7 @@ function seedDatabase(db) {
     seedReceiptSettings(db);
     seedAppSettings(db);
     seedPurchaseOrders(db);
+    normalizeSeedPurchaseOrderUnits(db);
   });
   seed();
 }
@@ -1065,6 +1066,28 @@ function seedPurchaseOrders(db) {
     }
   }
 }
+function normalizeSeedPurchaseOrderUnits(db) {
+  db.prepare(`
+    UPDATE purchase_order_items
+    SET order_unit = 'EACH'
+    WHERE purchase_order_id IN (
+      SELECT id
+      FROM purchase_orders
+      WHERE order_code LIKE 'PO-%-MOCK%'
+    )
+      AND (
+        order_unit IS NULL
+        OR TRIM(order_unit) = ''
+        OR UPPER(order_unit) IN (
+          'BOX', 'BOXES',
+          'BOTTLE', 'BOTTLES',
+          'PACK', 'PACKS',
+          'CARTON', 'CARTONS',
+          'BLISTER', 'BLISTERS'
+        )
+      )
+  `).run();
+}
 const require$1 = createRequire(import.meta.url);
 const BetterSqlite3 = require$1("better-sqlite3");
 class DatabaseManager {
@@ -1178,6 +1201,31 @@ class InventoryService {
     this.inventoryRepository.receiveBatch(productId, batch);
   }
 }
+const DEFAULT_ORDER_UNIT = "EACH";
+function toOrderUpper(value) {
+  if (value === null || value === void 0) return "";
+  return String(value).toUpperCase();
+}
+function toTrimmedOrderUpper(value) {
+  return toOrderUpper(value).trim();
+}
+function nullableOrderUpper(value) {
+  const normalized = toTrimmedOrderUpper(value);
+  return normalized || null;
+}
+function formatFiveDigitStockNo(value, fallback) {
+  const rawDigits = value === null || value === void 0 ? "" : String(value).replace(/\D/g, "");
+  const fallbackDigits = fallback === null || fallback === void 0 ? "" : String(fallback).replace(/\D/g, "");
+  const digits = rawDigits || fallbackDigits;
+  if (!digits) return null;
+  const parsed = Number.parseInt(digits, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return String(parsed).padStart(5, "0").slice(-5);
+}
+function toFiniteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 class OrdersService {
   constructor(ordersRepository) {
     this.ordersRepository = ordersRepository;
@@ -1193,7 +1241,56 @@ class OrdersService {
   }
   save(input) {
     const { items, ...order } = input;
-    this.ordersRepository.saveOrder(order, items);
+    const manufacturerName = toTrimmedOrderUpper(order.manufacturerName);
+    if (!manufacturerName) {
+      throw new Error("Supplier is required");
+    }
+    const normalizedItems = (items ?? []).map((item, index) => {
+      const stockName = toTrimmedOrderUpper(item.stockName);
+      const quantity = toFiniteNumber(item.quantity, stockName ? 1 : 0);
+      const unitCost = toFiniteNumber(item.unitCost);
+      const discPercent = toFiniteNumber(item.discPercent);
+      const computedNetUCost = unitCost * (1 - discPercent / 100);
+      const netUCost = toFiniteNumber(item.netUCost) || computedNetUCost;
+      const extCost = toFiniteNumber(item.extCost) || quantity * netUCost;
+      return {
+        ...item,
+        productId: item.productId ?? null,
+        stockNo: formatFiveDigitStockNo(item.stockNo, index + 1),
+        stockName,
+        orderUnit: nullableOrderUpper(item.orderUnit) || DEFAULT_ORDER_UNIT,
+        pkgQty: toFiniteNumber(item.pkgQty, 1) || 1,
+        quantity: quantity || 1,
+        unitCost,
+        discPercent,
+        netUCost,
+        extCost,
+        recvd: toFiniteNumber(item.recvd),
+        prNum: nullableOrderUpper(item.prNum),
+        remarks: nullableOrderUpper(item.remarks)
+      };
+    }).filter((item) => item.stockName);
+    if (normalizedItems.length === 0) {
+      throw new Error("At least one order item is required");
+    }
+    this.ordersRepository.saveOrder(
+      {
+        ...order,
+        manufacturerName,
+        total: normalizedItems.reduce((sum, item) => sum + item.extCost, 0),
+        contactPerson: nullableOrderUpper(order.contactPerson),
+        orderedByName: nullableOrderUpper(order.orderedByName),
+        remarks: nullableOrderUpper(order.remarks),
+        faxEmailRemarks: nullableOrderUpper(order.faxEmailRemarks),
+        notedBy: nullableOrderUpper(order.notedBy),
+        approvedBy: nullableOrderUpper(order.approvedBy),
+        qtyToOrder: nullableOrderUpper(order.qtyToOrder),
+        sysGen: Boolean(order.sysGen),
+        isClosed: Boolean(order.isClosed),
+        isLocked: Boolean(order.isLocked)
+      },
+      normalizedItems
+    );
   }
   delete(orderId) {
     this.ordersRepository.deleteOrder(orderId);
@@ -1997,7 +2094,7 @@ class OrdersRepository {
     const sortOrder = (query == null ? void 0 : query.sortOrder) === "asc" ? "ASC" : "DESC";
     const joinsSql = "FROM purchase_orders po LEFT JOIN users u ON u.id = po.ordered_by_user_id";
     const totalRow = this.db.prepare(`SELECT COUNT(*) AS count ${joinsSql} ${whereSql}`).get(params);
-    const items = this.db.prepare(`
+    const rows = this.db.prepare(`
         SELECT
           po.id,
           po.order_code AS orderCode,
@@ -2012,6 +2109,20 @@ class OrdersRepository {
           po.ordered_by_user_id AS orderedByUserId,
           COALESCE(po.ordered_by_name, u.full_name) AS orderedByName,
           po.remarks,
+          po.fax_email_remarks AS faxEmailRemarks,
+          po.noted_by AS notedBy,
+          po.approved_by AS approvedBy,
+          po.qty_to_order AS qtyToOrder,
+          po.sys_gen AS sysGen,
+          po.terms_days AS termsDays,
+          po.pay_due_date AS payDueDate,
+          po.is_closed AS isClosed,
+          po.is_locked AS isLocked,
+          (
+            SELECT COUNT(*)
+            FROM purchase_order_items poi_count
+            WHERE poi_count.purchase_order_id = po.id
+          ) AS itemCount,
           po.created_at AS createdAt,
           po.updated_at AS updatedAt
         ${joinsSql}
@@ -2019,6 +2130,12 @@ class OrdersRepository {
         ORDER BY po.placed_date ${sortOrder}, po.id ${sortOrder}
         LIMIT @limit OFFSET @offset
       `).all(params);
+    const items = rows.map((row) => ({
+      ...row,
+      sysGen: Boolean(row.sysGen),
+      isClosed: Boolean(row.isClosed),
+      isLocked: Boolean(row.isLocked)
+    }));
     return buildPaginatedResult(items, totalRow.count, page, pageSize);
   }
   updateStatus(orderId, status) {
@@ -2054,6 +2171,23 @@ class OrdersRepository {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     this.db.transaction(() => {
       let orderId = order.id;
+      const orderParams = {
+        ...order,
+        manufacturerId: order.manufacturerId ?? null,
+        contactPerson: order.contactPerson ?? null,
+        etaDate: order.etaDate ?? null,
+        orderedByUserId: order.orderedByUserId ?? null,
+        orderedByName: order.orderedByName ?? null,
+        remarks: order.remarks ?? null,
+        faxEmailRemarks: order.faxEmailRemarks ?? null,
+        notedBy: order.notedBy ?? null,
+        approvedBy: order.approvedBy ?? null,
+        qtyToOrder: order.qtyToOrder ?? null,
+        payDueDate: order.payDueDate ?? null,
+        sysGen: order.sysGen ? 1 : 0,
+        isClosed: order.isClosed ? 1 : 0,
+        isLocked: order.isLocked ? 1 : 0
+      };
       if (orderId) {
         this.db.prepare(`
           UPDATE purchase_orders SET
@@ -2063,7 +2197,10 @@ class OrdersRepository {
             total = @total,
             status = @status,
             eta_date = @etaDate,
+            placed_date = @placedDate,
             priority = @priority,
+            ordered_by_user_id = @orderedByUserId,
+            ordered_by_name = @orderedByName,
             remarks = @remarks,
             fax_email_remarks = @faxEmailRemarks,
             noted_by = @notedBy,
@@ -2071,10 +2208,13 @@ class OrdersRepository {
             qty_to_order = @qtyToOrder,
             terms_days = @termsDays,
             pay_due_date = @payDueDate,
+            sys_gen = @sysGen,
+            is_closed = @isClosed,
+            is_locked = @isLocked,
             updated_at = @updatedAt
           WHERE id = @id
         `).run({
-          ...order,
+          ...orderParams,
           updatedAt: timestamp
         });
         this.db.prepare("DELETE FROM purchase_order_items WHERE purchase_order_id = ?").run(orderId);
@@ -2091,16 +2231,18 @@ class OrdersRepository {
             total, status, eta_date, placed_date, priority,
             ordered_by_user_id, ordered_by_name, remarks, fax_email_remarks,
             noted_by, approved_by, qty_to_order, terms_days, pay_due_date,
+            sys_gen, is_closed, is_locked,
             created_at, updated_at
           ) VALUES (
             @orderCode, @manufacturerId, @manufacturerName, @contactPerson,
             @total, @status, @etaDate, @placedDate, @priority,
             @orderedByUserId, @orderedByName, @remarks, @faxEmailRemarks,
             @notedBy, @approvedBy, @qtyToOrder, @termsDays, @payDueDate,
+            @sysGen, @isClosed, @isLocked,
             @createdAt, @updatedAt
           )
         `).run({
-          ...order,
+          ...orderParams,
           orderCode,
           placedDate: order.placedDate || timestamp.split("T")[0],
           createdAt: timestamp,
@@ -2123,6 +2265,11 @@ class OrdersRepository {
         insertItem.run({
           ...item,
           purchaseOrderId: orderId,
+          productId: item.productId ?? null,
+          stockNo: item.stockNo ?? null,
+          orderUnit: item.orderUnit ?? "EACH",
+          prNum: item.prNum ?? null,
+          remarks: item.remarks ?? null,
           recvd: item.recvd || 0,
           pkgQty: item.pkgQty || 1
         });

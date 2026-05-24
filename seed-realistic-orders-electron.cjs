@@ -32,8 +32,6 @@ app.whenReady().then(() => {
     'Generic Pharma': ['Amoxicillin 500mg', 'Cotrimoxazole 400mg', 'Cephalexin 500mg', 'Phenylephrine 10mg', 'Carbocisteine 500mg', 'Ibuprofen 200mg', 'Tramadol 50mg', 'Diclofenac 50mg'],
   };
 
-  const orderUnits = ['Box', 'Bottle', 'Pack', 'Carton', 'Blister'];
-
   // Look up manufacturer IDs
   const mfgRows = db.prepare('SELECT id, name FROM manufacturers').all();
   const mfgLookup = {};
@@ -118,7 +116,7 @@ app.whenReady().then(() => {
 
           items.push({
             stockName,
-            orderUnit: orderUnits[j % orderUnits.length],
+            orderUnit: 'EACH',
             pkgQty: 1,
             quantity,
             unitCost,

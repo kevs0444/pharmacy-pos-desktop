@@ -152,6 +152,7 @@ export interface SaveOrderItemInput {
   discPercent: number
   netUCost: number
   extCost: number
+  recvd?: number
   prNum?: string | null
   remarks?: string | null
 }
@@ -175,6 +176,9 @@ export interface SaveOrderInput {
   qtyToOrder?: string | null
   termsDays: number
   payDueDate?: string | null
+  sysGen?: boolean
+  isClosed?: boolean
+  isLocked?: boolean
   items: SaveOrderItemInput[]
 }
 

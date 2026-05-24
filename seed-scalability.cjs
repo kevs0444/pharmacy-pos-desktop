@@ -84,7 +84,7 @@ try {
         items.push({
           stockNo,
           stockName: `${pref}${suff} ${dose}mg Tablet`,
-          orderUnit: 'boxes',
+          orderUnit: 'EACH',
           pkgQty: 1,
           quantity,
           unitCost,
