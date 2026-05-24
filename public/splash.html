@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotikaPlus Starting</title>
+  <style>
+    :root {
+      --brand-blue: #0ea5e9;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 16px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+    .logo-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 15px rgba(14, 165, 233, 0.2));
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1e293b;
+      letter-spacing: -0.5px;
+    }
+    .title span {
+      color: var(--brand-blue);
+    }
+    
+    .loading-container {
+      width: 70%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 4px;
+      background-color: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar {
+      width: 30%;
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+      border-radius: 4px;
+      animation: indeterminate 1.5s infinite ease-in-out;
+      box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+    }
+    .status-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); width: 30%; }
+      50% { width: 50%; }
+      100% { transform: translateX(350%); width: 30%; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .8; transform: scale(0.95); }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-container">
+    <!-- Load the same logo used in the app -->
+    <img src="./assets/logos/logo.png" alt="Logo" class="logo" onerror="this.style.display='none'" />
+    <div class="title">Botika<span>Plus</span></div>
+  </div>
+
+  <div class="loading-container">
+    <div class="progress-bar-bg">
+      <div class="progress-bar"></div>
+    </div>
+    <div class="status-text" id="status-text">Waking up...</div>
+  </div>
+
+  <script>
+    // Expose a function to update the status text from the main process
+    window.updateStatus = function(text) {
+      const el = document.getElementById('status-text');
+      if (el) {
+        el.textContent = text;
+      }
+    };
+  </script>
+</body>
+</html>

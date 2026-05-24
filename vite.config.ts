@@ -39,7 +39,13 @@ const api = {
     searchCustomers: (query) => ipcRenderer.invoke("pos:searchCustomers", query),
     saveCustomer: (input) => ipcRenderer.invoke("pos:saveCustomer", input)
   },
-  orders: { list: (q) => ipcRenderer.invoke("orders:list", q) },
+  orders: { 
+    list: (q) => ipcRenderer.invoke("orders:list", q),
+    getItems: (orderId) => ipcRenderer.invoke("orders:getItems", orderId),
+    updateStatus: (orderId, status) => ipcRenderer.invoke("orders:updateStatus", { orderId, status }),
+    save: (input) => ipcRenderer.invoke("orders:save", input),
+    delete: (orderId) => ipcRenderer.invoke("orders:delete", orderId)
+  },
   admin: { 
     listUsers: (q) => ipcRenderer.invoke("admin:listUsers", q), 
     listManufacturers: () => ipcRenderer.invoke("admin:listManufacturers"),

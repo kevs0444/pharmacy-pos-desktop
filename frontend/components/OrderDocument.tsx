@@ -47,7 +47,9 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   const [priority, setPriority] = useState("Normal");
   const [status, setStatus] = useState("Processing");
   const [isLocked, setIsLocked] = useState(false);
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem(0)]);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
 
   // Supplier contact info (derived from selected manufacturer)
   const supplierInfo = useMemo(() => {
@@ -90,19 +92,21 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
 
     setDocNo(order.orderCode);
     setOrderDate(order.placedDate);
-    setOrderedBy(order.orderedByName || "");
+    setOrderedBy(order.orderedByName || "CHA");
     setSupplier(order.manufacturerName);
-    setNotedBy("");
-    setApprovedBy("");
-    setTermsDays("30");
+    setNotedBy(order.notedBy || "");
+    setApprovedBy(order.approvedBy || "");
+    setTermsDays(order.termsDays?.toString() || "30");
+    setQtyToOrder(order.qtyToOrder || "1 week");
     setRemarks(order.remarks || "");
-    setFaxEmailRemarks("");
+    setFaxEmailRemarks(order.faxEmailRemarks || "");
     setPriority(order.priority);
     setStatus(order.status);
-    setIsLocked(order.status === "Delivered" || order.status === "Cancelled");
+    setIsLocked(order.isLocked || order.status === "Delivered" || order.status === "Cancelled");
 
-    // Calculate pay due date from placed date + terms
-    if (order.placedDate) {
+    if (order.payDueDate) {
+      setPayDueDate(order.payDueDate);
+    } else if (order.placedDate) {
       try {
         const placed = new Date(order.placedDate);
         placed.setDate(placed.getDate() + 30);
@@ -114,6 +118,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
 
     // Load line items from DB
     async function loadItems() {
+      setIsLoadingItems(true);
       try {
         const dbItems = await window.api.orders.getItems(order!.id);
         if (dbItems.length > 0) {
@@ -141,6 +146,8 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
       } catch (e: any) {
         console.error("Failed to load order items:", e);
         setLineItems([emptyLineItem(0)]);
+      } finally {
+        setIsLoadingItems(false);
       }
     }
     loadItems();
@@ -222,20 +229,65 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
       <div className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className={cn("text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1.5", statusCfg.cls)}>
+            <button 
+              disabled={isLocked}
+              onClick={() => {
+                if (isLocked) return;
+                const cycle: Record<string, string> = {
+                  "Processing": "In Transit",
+                  "In Transit": "Delivered",
+                  "Delivered": "Processing",
+                  "Cancelled": "Processing"
+                };
+                setStatus(cycle[status] || "Processing");
+              }}
+              className={cn("text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition-colors cursor-pointer hover:opacity-80 active:scale-95 disabled:opacity-100 disabled:cursor-not-allowed", statusCfg.cls)}
+              title={isLocked ? "Order is locked" : "Click to change status"}
+            >
               <StatusIcon className="w-3 h-3" />
               {statusCfg.label}
-            </span>
+            </button>
             {priority === "Urgent" && (
               <span className="text-[10px] font-extrabold uppercase bg-red-100 text-red-600 px-2 py-1 rounded-full border border-red-200">
                 🚨 Urgent
               </span>
             )}
           </div>
+          
+          {!isHeaderExpanded && (
+             <div className="hidden md:flex flex-1 mx-4 items-center gap-3 text-[10px] uppercase font-bold tracking-wider text-slate-500 overflow-hidden whitespace-nowrap">
+                <span className="text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{docNo || "NEW PO"}</span>
+                <span className="opacity-50">•</span>
+                <span>{orderDate}</span>
+                <span className="opacity-50">•</span>
+                <span><span className="opacity-60 mr-1">Supplier:</span> <span className="text-brand-blue">{supplier || "Not selected"}</span></span>
+                <span className="opacity-50">•</span>
+                <span><span className="opacity-60 mr-1">Total:</span> <span className="text-emerald-600">₱{(computedTotals.totalOrder || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
+                <span className="opacity-50">•</span>
+                <span><span className="opacity-60 mr-1">By:</span> {orderedBy || "N/A"}</span>
+                {(notedBy || approvedBy) && (
+                   <>
+                     <span className="opacity-50">•</span>
+                     <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                       <CheckCircle className="w-3 h-3" /> 
+                       {approvedBy || notedBy}
+                     </span>
+                   </>
+                )}
+             </div>
+          )}
+
+          <button 
+            onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
+            className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors shadow-sm"
+          >
+            {isHeaderExpanded ? "Minimize Header" : "Expand Header"}
+          </button>
         </div>
 
-        {/* Form fields — 4-column layout */}
-        <div className="grid grid-cols-[1.5fr_1.2fr_1fr_0.8fr] gap-3">
+        {/* Form fields — Responsive 4-column layout */}
+        {isHeaderExpanded && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {/* Column 1: Order Details */}
           <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative pt-4">
             <div className="absolute -top-[10px] left-3 bg-white px-1.5">
@@ -244,14 +296,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
             
             <div className="flex items-center gap-1 mt-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Doc No</label>
-              <div className="flex items-center gap-1.5 w-full max-w-[200px]">
-                 <input type="text" value={docNo || ""} readOnly className="w-[110px] px-2 py-1 text-xs font-bold text-slate-800 outline-none bg-white border border-slate-300 rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all" />
-                 <div className="flex items-center gap-0.5">
-                    <button onClick={() => onNavigate && onNavigate("prev")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronLeft className="w-3.5 h-3.5"/></button>
-                    <button onClick={() => onNavigate && onNavigate("next")} className="px-1.5 py-1 hover:bg-slate-200 transition-colors bg-white border border-slate-300 rounded shadow-sm text-slate-500 outline-none"><ChevronRight className="w-3.5 h-3.5"/></button>
-                 </div>
-                 <span className="text-[10px] font-bold text-slate-400 ml-1">{orderDate ? orderDate.slice(0, 7) : ""}</span>
-              </div>
+              <input type="text" value={docNo || ""} readOnly className="flex-1 w-full px-2 py-0.5 text-xs font-bold text-slate-800 outline-none bg-white border border-slate-300 rounded shadow-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-all" />
             </div>
             
             <div className="flex items-center gap-1">
@@ -263,7 +308,8 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[80px] text-right pr-2">Ordered By</label>
                <select value={orderedBy || ""} onChange={(e) => setOrderedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
                   <option value="CHA">CHA</option>
-                  <option value="ADMIN">ADMIN</option>
+                  <option value="System Administrator">System Administrator</option>
+                  <option value="Branch Manager">Branch Manager</option>
                </select>
             </div>
 
@@ -298,17 +344,26 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
              
              <div className="flex items-center gap-1 mt-1">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Noted By</label>
-               <select value={notedBy || ""} onChange={(e) => setNotedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700"><option value=""></option></select>
+               <select value={notedBy || ""} onChange={(e) => setNotedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+                 <option value=""></option>
+                 <option value="Branch Manager">Branch Manager</option>
+                 <option value="System Administrator">System Administrator</option>
+               </select>
              </div>
              <div className="flex items-center gap-1">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Approved By</label>
-               <select value={approvedBy || ""} onChange={(e) => setApprovedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700"><option value=""></option></select>
+               <select value={approvedBy || ""} onChange={(e) => setApprovedBy(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+                 <option value=""></option>
+                 <option value="System Administrator">System Administrator</option>
+                 <option value="Branch Manager">Branch Manager</option>
+               </select>
              </div>
              <div className="flex items-center gap-1">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">QtyToOrder</label>
                <select value={qtyToOrder || ""} onChange={(e) => setQtyToOrder(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
                   <option value="1 week">1 week</option>
                   <option value="2 weeks">2 weeks</option>
+                  <option value="1 month">1 month</option>
                </select>
              </div>
              <div className="flex items-center gap-1 ml-[79px] mt-1">
@@ -336,7 +391,14 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
              
              <div className="flex items-center gap-1 mt-1">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Terms (days)</label>
-               <input type="text" value={termsDays || ""} onChange={(e) => setTermsDays(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white text-center outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700" />
+               <select value={termsDays || "30"} onChange={(e) => setTermsDays(e.target.value)} className="flex-1 w-full px-2 py-0.5 text-xs border border-slate-300 rounded bg-white text-center outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all text-slate-700">
+                 <option value="7">7</option>
+                 <option value="15">15</option>
+                 <option value="30">30</option>
+                 <option value="45">45</option>
+                 <option value="60">60</option>
+                 <option value="90">90</option>
+               </select>
              </div>
              <div className="flex items-center gap-1">
                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap shrink-0 w-[75px] text-right pr-2">Pay Due Date</label>
@@ -410,20 +472,24 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
              </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* ── Line Items Grid ── */}
-      <div className="flex-1 overflow-auto p-4 bg-slate-50">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="flex-1 overflow-hidden p-4 bg-slate-50 flex flex-col min-h-0">
+        <div className="mb-2 flex items-center justify-between shrink-0">
           <p className="text-[10px] text-slate-400 font-medium">
             💡 Type in the <strong>Stock Name</strong> column to search and select items from inventory.
           </p>
         </div>
-        <OrderLineItemGrid
+        <div className="flex-1 min-h-0">
+          <OrderLineItemGrid
           items={lineItems}
           onItemsChange={setLineItems}
           readOnly={isLocked}
+          isLoading={isLoadingItems}
         />
+        </div>
       </div>
     </div>
   );

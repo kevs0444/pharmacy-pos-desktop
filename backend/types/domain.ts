@@ -130,6 +130,7 @@ export interface PurchaseOrderRecord {
   payDueDate: string | null
   isClosed: boolean
   isLocked: boolean
+  itemCount?: number
   createdAt: string
   updatedAt: string
 }

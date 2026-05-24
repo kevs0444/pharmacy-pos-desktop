@@ -70,13 +70,21 @@ function generateMockPurchaseOrders() {
     const items = []
     let total = 0
     
+    const prefixes = ['Amoxi', 'Ceti', 'Para', 'Ibu', 'Losar', 'Omepra', 'Salbu', 'Metfor', 'Amlodi', 'Vitam', 'Aspi'];
+    const suffixes = ['cillin', 'rizine', 'cetamol', 'profen', 'tan', 'zole', 'tamol', 'min', 'pine', 'in C', 'rin'];
+    
     for (let j = 0; j < itemsCount; j++) {
       const quantity = Math.floor(Math.random() * 50) + 10
       const unitCost = Math.floor(Math.random() * 500) + 50
       const extCost = quantity * unitCost
       total += extCost
+      
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      const dose = [50, 100, 250, 500][Math.floor(Math.random() * 4)];
+      
       items.push({
-        stockName: `Mock Item ${i}-${j}`,
+        stockName: `${pref}${suff} ${dose}mg Tablet`,
         orderUnit: 'boxes',
         pkgQty: 1,
         quantity,
@@ -91,14 +99,22 @@ function generateMockPurchaseOrders() {
     }
 
     const padI = String(i).padStart(4, '0')
+    const now = new Date();
+    now.setMonth(now.getMonth() - (i % 4)); // spread over last 4 months
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+    const placedDate = `${y}-${m}-${d}`;
+    const etaDate = `${y}-${m}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`;
+    
     orders.push({
-      orderCode: `PO-2026-MOCK${padI}`,
+      orderCode: `PO-${y}-MOCK${padI}`,
       manufacturerName: mfg.name,
       contactPerson: mfg.contact,
       total,
       status,
-      etaDate: `2026-03-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-      placedDate: `2026-02-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+      etaDate,
+      placedDate,
       priority,
       orderedByName: user,
       remarks: null,
@@ -565,15 +581,30 @@ function seedProducts(db: Database.Database): void {
     })
   }
 
-  // Generate 1000 dummy products for performance testing
+  // Generate 1000 realistic dummy products for performance testing
   const generateCount = 1000;
   if (existingCodes.size < generateCount) {
     const manufacturerIds = Array.from(manufacturerLookup.values());
     const manufacturerId = manufacturerIds.length > 0 ? manufacturerIds[0] : null;
 
+    const prefixes = ['Amoxi', 'Ceti', 'Para', 'Ibu', 'Losar', 'Omepra', 'Salbu', 'Metfor', 'Amlodi', 'Vitam', 'Aspi', 'Doxa', 'Lisin', 'Simva', 'Azythro', 'Cipro', 'Flucon', 'Gabapen', 'Levothy', 'Predni', 'Cef', 'Rosi', 'Panto', 'Enalo', 'Clopido'];
+    const suffixes = ['cillin', 'rizine', 'cetamol', 'profen', 'tan', 'zole', 'tamol', 'min', 'pine', 'in C', 'rin', 'zosin', 'pril', 'statin', 'mycin', 'floxacin', 'azole', 'tin', 'roxine', 'sone', 'roxime', 'glitazone'];
+    const dosages = ['5mg', '10mg', '20mg', '25mg', '50mg', '100mg', '200mg', '250mg', '500mg', '800mg', '1g'];
+    const units = ['Tablet', 'Capsule', 'Syrup', 'Suspension', 'Injection', 'Cream'];
+    const brandNames = ['Pfizer', 'GSK', 'Unilab', 'RiteMed', 'Novartis', 'Sanofi', 'Bayer', 'TGP', 'Generic'];
+
     for (let i = 1; i <= generateCount; i++) {
-      const code = `DUMMY-${i.toString().padStart(4, '0')}`;
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      const dose = dosages[Math.floor(Math.random() * dosages.length)];
+      const unit = units[Math.floor(Math.random() * units.length)];
+      const brand = brandNames[Math.floor(Math.random() * brandNames.length)];
+
+      const code = `PRD-${(3000 + i).toString()}`;
       if (existingCodes.has(code)) continue;
+
+      const genericName = `${pref}${suff}`;
+      const name = `${genericName} ${dose} ${unit} (${brand})`;
 
       const timestamp = nowIso();
       const basePrice = Math.floor(Math.random() * 500) + 50;
@@ -582,10 +613,10 @@ function seedProducts(db: Database.Database): void {
 
       const result = insertProduct.run({
         code,
-        name: `Test Medicine ${i}`,
-        genericName: `Generic Form ${i}`,
+        name,
+        genericName,
         manufacturerId,
-        brandType: 'Generic',
+        brandType: brand === 'Generic' ? 'Generic' : 'Branded',
         category: 'Pharmaceutical',
         subCategory: 'Over-the-Counter (OTC)',
         packagingUnit: 'Box',

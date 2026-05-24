@@ -23,6 +23,11 @@ export class OrdersRepository {
       )`)
     }
 
+    if (query?.period) {
+      params.period = `${query.period}%`
+      whereClauses.push('po.placed_date LIKE @period')
+    }
+
     if (query?.manufacturer && query.manufacturer !== 'All') {
       params.manufacturer = query.manufacturer
       whereClauses.push('po.manufacturer_name = @manufacturer')
@@ -201,6 +206,16 @@ export class OrdersRepository {
           recvd: item.recvd || 0,
           pkgQty: item.pkgQty || 1
         })
+      }
+    })()
+  }
+
+  deleteOrder(orderId: number): void {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id = ?').run(orderId)
+      const result = this.db.prepare('DELETE FROM purchase_orders WHERE id = ?').run(orderId)
+      if (result.changes === 0) {
+        throw new Error(`Purchase order with ID ${orderId} not found`)
       }
     })()
   }

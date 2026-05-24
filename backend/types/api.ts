@@ -133,6 +133,7 @@ export interface CustomerSaveInput {
 
 export interface OrderListQuery extends PaginationQuery {
   search?: string
+  period?: string
   manufacturer?: string
   status?: OrderStatus | 'All'
   priority?: OrderPriority | 'All'
@@ -243,6 +244,7 @@ export interface PharmacyApi {
     getItems: (orderId: number) => Promise<PurchaseOrderItemRecord[]>
     updateStatus: (orderId: number, status: OrderStatus) => Promise<void>
     save: (input: SaveOrderInput) => Promise<void>
+    delete: (orderId: number) => Promise<void>
   }
   admin: {
     listUsers: (query?: AdminUserListQuery) => Promise<PaginatedResult<Omit<UserRecord, 'passwordHash'>>>

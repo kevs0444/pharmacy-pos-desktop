@@ -17,6 +17,7 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let splash: BrowserWindow | null = null
 let databaseManager: DatabaseManager | null = null
 
 // Remove default OS menu to match the clean web app look
@@ -38,7 +39,6 @@ function createWindow() {
   })
 
   win.maximize()
-  win.show()
 
   // Prevent menubar from appearing even if ALT is pressed.
   win.setMenuBarVisibility(false)
@@ -50,11 +50,73 @@ function createWindow() {
   }
 }
 
+function createSplashWindow() {
+  splash = new BrowserWindow({
+    width: 400,
+    height: 300,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    show: false,
+    icon: path.join(process.env.APP_ROOT!, 'frontend', 'assets', 'logos', 'logo.png'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  })
+
+  const splashPath = path.join(process.env.VITE_PUBLIC!, 'splash.html')
+    
+  splash.loadFile(splashPath)
+  
+  splash.once('ready-to-show', () => {
+    splash?.show()
+  })
+}
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 async function bootstrapApplication() {
+  createSplashWindow()
+  
+  // Give it a moment to render
+  await sleep(100)
+
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Initializing database...")`).catch(() => {})
+  }
+  await sleep(50)
+
   databaseManager = DatabaseManager.bootstrap(app)
+
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Optimizing performance...")`).catch(() => {})
+  }
+  await sleep(50)
+
   const services = createAppServices(databaseManager)
   registerIpcHandlers(services)
+
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Starting application UI...")`).catch(() => {})
+  }
+  await sleep(50)
+
   createWindow()
+
+  if (win) {
+    win.once('ready-to-show', () => {
+      if (splash) {
+        splash.close()
+        splash = null
+      }
+      win?.show()
+      win?.maximize()
+    })
+  }
 }
 
 app.on('window-all-closed', () => {

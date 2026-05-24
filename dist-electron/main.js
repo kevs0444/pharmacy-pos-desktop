@@ -362,6 +362,19 @@ const addShelfLocationMigration = {
     ALTER TABLE products ADD COLUMN shelf_location TEXT DEFAULT NULL;
   `
 };
+const addPerformanceIndexesMigration = {
+  id: "008",
+  name: "add_performance_indexes",
+  up: `
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_placed_date ON purchase_orders(placed_date);
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_code ON purchase_orders(order_code);
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
+    CREATE INDEX IF NOT EXISTS idx_purchase_order_items_po_id ON purchase_order_items(purchase_order_id);
+    CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
+    CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+  `
+};
 const migrations = [
   initialSchemaMigration,
   fixCategoriesMigration,
@@ -369,7 +382,8 @@ const migrations = [
   inventoryChangeRequestsMigration,
   customersMigration,
   purchaseOrdersSchemaUpdateMigration,
-  addShelfLocationMigration
+  addShelfLocationMigration,
+  addPerformanceIndexesMigration
 ];
 const KEY_LENGTH = 64;
 function hashPassword(password) {
@@ -441,13 +455,18 @@ function generateMockPurchaseOrders() {
     const itemsCount = Math.floor(Math.random() * 5) + 1;
     const items = [];
     let total = 0;
+    const prefixes = ["Amoxi", "Ceti", "Para", "Ibu", "Losar", "Omepra", "Salbu", "Metfor", "Amlodi", "Vitam", "Aspi"];
+    const suffixes = ["cillin", "rizine", "cetamol", "profen", "tan", "zole", "tamol", "min", "pine", "in C", "rin"];
     for (let j = 0; j < itemsCount; j++) {
       const quantity = Math.floor(Math.random() * 50) + 10;
       const unitCost = Math.floor(Math.random() * 500) + 50;
       const extCost = quantity * unitCost;
       total += extCost;
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      const dose = [50, 100, 250, 500][Math.floor(Math.random() * 4)];
       items.push({
-        stockName: `Mock Item ${i}-${j}`,
+        stockName: `${pref}${suff} ${dose}mg Tablet`,
         orderUnit: "boxes",
         pkgQty: 1,
         quantity,
@@ -461,14 +480,21 @@ function generateMockPurchaseOrders() {
       });
     }
     const padI = String(i).padStart(4, "0");
+    const now = /* @__PURE__ */ new Date();
+    now.setMonth(now.getMonth() - i % 4);
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(Math.floor(Math.random() * 28) + 1).padStart(2, "0");
+    const placedDate = `${y}-${m}-${d}`;
+    const etaDate = `${y}-${m}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`;
     orders.push({
-      orderCode: `PO-2026-MOCK${padI}`,
+      orderCode: `PO-${y}-MOCK${padI}`,
       manufacturerName: mfg.name,
       contactPerson: mfg.contact,
       total,
       status,
-      etaDate: `2026-03-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`,
-      placedDate: `2026-02-${String(Math.floor(Math.random() * 28) + 1).padStart(2, "0")}`,
+      etaDate,
+      placedDate,
       priority,
       orderedByName: user,
       remarks: null,
@@ -888,19 +914,31 @@ function seedProducts(db) {
   if (existingCodes.size < generateCount) {
     const manufacturerIds = Array.from(manufacturerLookup.values());
     const manufacturerId = manufacturerIds.length > 0 ? manufacturerIds[0] : null;
+    const prefixes = ["Amoxi", "Ceti", "Para", "Ibu", "Losar", "Omepra", "Salbu", "Metfor", "Amlodi", "Vitam", "Aspi", "Doxa", "Lisin", "Simva", "Azythro", "Cipro", "Flucon", "Gabapen", "Levothy", "Predni", "Cef", "Rosi", "Panto", "Enalo", "Clopido"];
+    const suffixes = ["cillin", "rizine", "cetamol", "profen", "tan", "zole", "tamol", "min", "pine", "in C", "rin", "zosin", "pril", "statin", "mycin", "floxacin", "azole", "tin", "roxine", "sone", "roxime", "glitazone"];
+    const dosages = ["5mg", "10mg", "20mg", "25mg", "50mg", "100mg", "200mg", "250mg", "500mg", "800mg", "1g"];
+    const units = ["Tablet", "Capsule", "Syrup", "Suspension", "Injection", "Cream"];
+    const brandNames = ["Pfizer", "GSK", "Unilab", "RiteMed", "Novartis", "Sanofi", "Bayer", "TGP", "Generic"];
     for (let i = 1; i <= generateCount; i++) {
-      const code = `DUMMY-${i.toString().padStart(4, "0")}`;
+      const pref = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const suff = suffixes[Math.floor(Math.random() * suffixes.length)];
+      const dose = dosages[Math.floor(Math.random() * dosages.length)];
+      const unit = units[Math.floor(Math.random() * units.length)];
+      const brand = brandNames[Math.floor(Math.random() * brandNames.length)];
+      const code = `PRD-${(3e3 + i).toString()}`;
       if (existingCodes.has(code)) continue;
+      const genericName = `${pref}${suff}`;
+      const name = `${genericName} ${dose} ${unit} (${brand})`;
       const timestamp = nowIso();
       const basePrice = Math.floor(Math.random() * 500) + 50;
       const ppu = 100;
       const initialStockPieces = ppu * 5;
       const result = insertProduct.run({
         code,
-        name: `Test Medicine ${i}`,
-        genericName: `Generic Form ${i}`,
+        name,
+        genericName,
         manufacturerId,
-        brandType: "Generic",
+        brandType: brand === "Generic" ? "Generic" : "Branded",
         category: "Pharmaceutical",
         subCategory: "Over-the-Counter (OTC)",
         packagingUnit: "Box",
@@ -1152,6 +1190,9 @@ class OrdersService {
   save(input) {
     const { items, ...order } = input;
     this.ordersRepository.saveOrder(order, items);
+  }
+  delete(orderId) {
+    this.ordersRepository.deleteOrder(orderId);
   }
 }
 class PosService {
@@ -1928,6 +1969,10 @@ class OrdersRepository {
         )
       )`);
     }
+    if (query == null ? void 0 : query.period) {
+      params.period = `${query.period}%`;
+      whereClauses.push("po.placed_date LIKE @period");
+    }
     if ((query == null ? void 0 : query.manufacturer) && query.manufacturer !== "All") {
       params.manufacturer = query.manufacturer;
       whereClauses.push("po.manufacturer_name = @manufacturer");
@@ -2077,6 +2122,15 @@ class OrdersRepository {
           recvd: item.recvd || 0,
           pkgQty: item.pkgQty || 1
         });
+      }
+    })();
+  }
+  deleteOrder(orderId) {
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM purchase_order_items WHERE purchase_order_id = ?").run(orderId);
+      const result = this.db.prepare("DELETE FROM purchase_orders WHERE id = ?").run(orderId);
+      if (result.changes === 0) {
+        throw new Error(`Purchase order with ID ${orderId} not found`);
       }
     })();
   }
@@ -2488,6 +2542,7 @@ function registerIpcHandlers(services) {
     ({ orderId, status }) => services.ordersService.updateStatus(orderId, status)
   );
   registerHandler("orders:save", (payload) => services.ordersService.save(payload));
+  registerHandler("orders:delete", (orderId) => services.ordersService.delete(orderId));
   registerHandler("admin:listUsers", (query) => services.adminService.listUsers(query));
   registerHandler("admin:listManufacturers", () => services.adminService.listManufacturers());
   registerHandler("admin:createManufacturer", (payload) => services.adminService.createManufacturer(payload));
@@ -2512,6 +2567,7 @@ const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
+let splash = null;
 let databaseManager = null;
 Menu.setApplicationMenu(null);
 function createWindow() {
@@ -2529,7 +2585,6 @@ function createWindow() {
     }
   });
   win.maximize();
-  win.show();
   win.setMenuBarVisibility(false);
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
@@ -2537,11 +2592,62 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 }
+function createSplashWindow() {
+  splash = new BrowserWindow({
+    width: 400,
+    height: 300,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    show: false,
+    icon: path.join(process.env.APP_ROOT, "frontend", "assets", "logos", "logo.png"),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+  const splashPath = path.join(process.env.VITE_PUBLIC, "splash.html");
+  splash.loadFile(splashPath);
+  splash.once("ready-to-show", () => {
+    splash == null ? void 0 : splash.show();
+  });
+}
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 async function bootstrapApplication() {
+  createSplashWindow();
+  await sleep(100);
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Initializing database...")`).catch(() => {
+    });
+  }
+  await sleep(50);
   databaseManager = DatabaseManager.bootstrap(app);
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Optimizing performance...")`).catch(() => {
+    });
+  }
+  await sleep(50);
   const services = createAppServices(databaseManager);
   registerIpcHandlers(services);
+  if (splash) {
+    splash.webContents.executeJavaScript(`window.updateStatus && window.updateStatus("Starting application UI...")`).catch(() => {
+    });
+  }
+  await sleep(50);
   createWindow();
+  if (win) {
+    win.once("ready-to-show", () => {
+      if (splash) {
+        splash.close();
+        splash = null;
+      }
+      win == null ? void 0 : win.show();
+      win == null ? void 0 : win.maximize();
+    });
+  }
 }
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

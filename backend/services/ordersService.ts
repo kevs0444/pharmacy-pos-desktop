@@ -21,4 +21,8 @@ export class OrdersService {
     const { items, ...order } = input
     this.ordersRepository.saveOrder(order, items)
   }
+
+  delete(orderId: number): void {
+    this.ordersRepository.deleteOrder(orderId)
+  }
 }
