@@ -50,17 +50,21 @@ export function DataGridRow({
   children,
   className,
   isHighlight = false,
+  onClick,
 }: {
   children: ReactNode;
   className?: string;
   isHighlight?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <tr
+      onClick={onClick}
       className={cn(
         "transition-colors duration-100 group",
+        onClick && "cursor-pointer",
         isHighlight
-          ? "bg-amber-50/60 hover:bg-amber-100/60"
+          ? "bg-blue-50/70 hover:bg-blue-100/60"
           : "even:bg-slate-50/40 hover:bg-blue-50/40",
         className
       )}
