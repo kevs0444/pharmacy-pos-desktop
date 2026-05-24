@@ -49,16 +49,13 @@ function normalizeOrderText(order: PurchaseOrderRecord): PurchaseOrderRecord {
 
 function TBtn({ children, onClick, color = "slate" }: { children: React.ReactNode; onClick?: () => void; color?: "blue"|"green"|"amber"|"red"|"indigo"|"slate"|"purple" }) {
   const cls: Record<string, string> = {
-    blue:   "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50",
-    green:  "bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50",
-    amber:  "bg-white border border-amber-200 text-amber-600 hover:bg-amber-50",
-    red:    "bg-white border border-red-200 text-red-600 hover:bg-red-50",
-    indigo: "bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50",
-    purple: "bg-white border border-purple-200 text-purple-600 hover:bg-purple-50",
-    slate:  "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
-    primary: "bg-brand-blue hover:bg-blue-700 text-white border border-transparent shadow-sm",
-    success: "bg-emerald-600 hover:bg-emerald-700 text-white border border-transparent shadow-sm",
-    warning: "bg-amber-500 hover:bg-amber-600 text-white border border-transparent shadow-sm",
+    blue:   "bg-brand-blue hover:bg-blue-700 text-white",
+    green:  "bg-emerald-600 hover:bg-emerald-700 text-white",
+    amber:  "bg-amber-500 hover:bg-amber-600 text-white",
+    red:    "bg-red-500 hover:bg-red-600 text-white",
+    indigo: "bg-indigo-600 hover:bg-indigo-700 text-white",
+    purple: "bg-purple-600 hover:bg-purple-700 text-white",
+    slate:  "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300",
   };
   return (
     <button
@@ -326,33 +323,31 @@ export function Orders() {
         )}
       </PageHeader>
 
-      {/* ── Toolbar ── */}
-      <div className="px-5 py-2 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 flex gap-2 items-center overflow-x-auto custom-scrollbar shadow-[0_1px_4px_rgba(0,0,0,0.06)] shrink-0">
+      {/* ── Toolbar Row 1: Filters & Navigation ── */}
+      <div className="px-4 py-2 border-b border-slate-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 flex gap-2 items-center shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
-        {/* Period */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Period</span>
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <button onClick={() => { const d = new Date(periodFilter + "-01"); d.setMonth(d.getMonth()-1); setPeriodFilter(d.toISOString().slice(0,7)); setCurrentPage(1); }}
-              className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 border-r border-slate-200 transition-colors">
-              <ChevronLeft className="w-3 h-3"/>
-            </button>
-            <button onClick={() => { const d = new Date(periodFilter + "-01"); d.setMonth(d.getMonth()+1); setPeriodFilter(d.toISOString().slice(0,7)); setCurrentPage(1); }}
-              className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 transition-colors">
-              <ChevronRight className="w-3 h-3"/>
-            </button>
-          </div>
-          <input type="month" value={periodFilter}
-            onChange={(e) => { setPeriodFilter(e.target.value); setCurrentPage(1); }}
-            className="h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none w-[130px] shadow-sm"
-          />
+        {/* Period Navigator */}
+        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Period</span>
+        <div className="flex items-center rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden shrink-0">
+          <button onClick={() => { const d = new Date(periodFilter + "-01"); d.setMonth(d.getMonth()-1); setPeriodFilter(d.toISOString().slice(0,7)); setCurrentPage(1); }}
+            className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 border-r border-slate-200 transition-colors">
+            <ChevronLeft className="w-3 h-3"/>
+          </button>
+          <button onClick={() => { const d = new Date(periodFilter + "-01"); d.setMonth(d.getMonth()+1); setPeriodFilter(d.toISOString().slice(0,7)); setCurrentPage(1); }}
+            className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 transition-colors">
+            <ChevronRight className="w-3 h-3"/>
+          </button>
         </div>
+        <input type="month" value={periodFilter}
+          onChange={(e) => { setPeriodFilter(e.target.value); setCurrentPage(1); }}
+          className="h-7 px-2 text-[11px] border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none w-[120px] shadow-sm shrink-0"
+        />
 
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-px h-5 bg-slate-200 shrink-0" />
 
         {/* Smart Search */}
-        <div className="relative" ref={searchWrapperRef}>
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+        <div className="relative shrink-0" ref={searchWrapperRef}>
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1.5 text-slate-400" />
           <input type="text" value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -364,17 +359,17 @@ export function Orders() {
               }
             }}
             placeholder="Search PO / supplier..."
-            className="w-52 h-8 pl-8 pr-3 text-xs bg-white border border-slate-200 rounded-lg shadow-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 placeholder:text-slate-300"
+            className="w-48 h-7 pl-8 pr-3 text-[11px] bg-white border border-slate-200 rounded-lg shadow-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 placeholder:text-slate-300"
           />
           {isSearchFocused && searchOptions.length > 0 && (
-            <div className="absolute top-full left-0 mt-1 w-[350px] bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
-              <div className="px-2 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <div className="absolute top-full left-0 mt-1 w-[340px] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50">
+              <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Top Matches</span>
-                <span className="text-[9px] text-slate-400">Press Enter to filter grid</span>
+                <span className="text-[9px] text-slate-400">Enter to filter</span>
               </div>
-              <ul className="max-h-64 overflow-y-auto">
+              <ul className="max-h-60 overflow-y-auto">
                 {searchOptions.map(opt => (
-                  <li key={opt.id} 
+                  <li key={opt.id}
                       onMouseDown={() => {
                         setSearchInput(opt.orderCode);
                         setSearchQuery(opt.orderCode);
@@ -384,12 +379,12 @@ export function Orders() {
                       }}
                       className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-slate-700">{opt.orderCode}</div>
+                      <div className="font-bold text-slate-700 text-[11px]">{opt.orderCode}</div>
                       <div className="text-[10px] text-slate-500 truncate">{toOrderUpper(opt.manufacturerName)}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] font-medium text-slate-600">{opt.placedDate}</div>
-                      <div className={cn("text-[9px] font-extrabold uppercase px-1.5 rounded-full mt-0.5", 
+                      <div className={cn("text-[9px] font-extrabold uppercase px-1.5 rounded-full mt-0.5",
                           opt.status === "Delivered" ? "bg-emerald-100 text-emerald-700" :
                           opt.status === "Cancelled" ? "bg-red-100 text-red-600" :
                           "bg-amber-100 text-amber-700"
@@ -402,92 +397,80 @@ export function Orders() {
           )}
         </div>
 
-        {/* Navigate PO */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => navigateRecord("prev")}
+        {/* Record Nav */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={() => navigateRecord("prev")}
             disabled={filteredOrders.length === 0 || (currentRecordIdx <= 0 && currentPage <= 1)}
-            title="Newer order"
-            aria-label="Go to newer order"
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30 disabled:hover:bg-white"
-          >
+            className="h-7 w-7 flex items-center justify-center rounded-l-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30">
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => navigateRecord("next")}
+          <button onClick={() => navigateRecord("next")}
             disabled={filteredOrders.length === 0 || (currentRecordIdx >= filteredOrders.length - 1 && currentPage >= totalPages)}
-            title="Older order"
-            aria-label="Go to older order"
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30 disabled:hover:bg-white"
-          >
+            className="h-7 w-7 flex items-center justify-center rounded-r-lg border-y border-r border-slate-200 bg-white hover:bg-slate-100 text-slate-500 transition-colors shadow-sm disabled:opacity-30">
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-px h-5 bg-slate-200 shrink-0" />
 
         {/* Status Filter */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Status</span>
-          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
-            className="h-8 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none shadow-sm uppercase">
-            <option value="All">ALL</option>
-            <option value="Processing">PROCESSING</option>
-            <option value="In Transit">IN TRANSIT</option>
-            <option value="Delivered">DELIVERED</option>
-            <option value="Cancelled">CANCELLED</option>
-          </select>
-        </div>
+        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Status</span>
+        <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
+          className="h-7 px-2 text-[11px] border border-slate-200 rounded-lg bg-white text-slate-700 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/10 outline-none shadow-sm uppercase shrink-0">
+          <option value="All">ALL</option>
+          <option value="Processing">PROCESSING</option>
+          <option value="In Transit">IN TRANSIT</option>
+          <option value="Delivered">DELIVERED</option>
+          <option value="Cancelled">CANCELLED</option>
+        </select>
 
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-px h-5 bg-slate-200 shrink-0" />
 
-        {/* Server-Side Pagination */}
-        <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shadow-inner">
+        {/* Pagination */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
-            Page {currentPage} of {totalPages} <span className="text-slate-400 font-normal">({totalCount} items)</span>
+            Pg {currentPage}/{totalPages}
+            <span className="text-slate-400 font-normal ml-1">({totalCount})</span>
           </span>
-          <div className="flex items-center gap-0.5">
-            <button 
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              className="p-1 rounded hover:bg-white border border-transparent hover:border-slate-300 text-slate-500 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
+          <div className="flex items-center border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+            <button disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 border-r border-slate-200 disabled:opacity-30 transition-colors">
+              <ChevronLeft className="w-3 h-3" />
             </button>
-            <button 
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              className="p-1 rounded hover:bg-white border border-transparent hover:border-slate-300 text-slate-500 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
+            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              className="px-1.5 py-1.5 hover:bg-slate-100 text-slate-500 disabled:opacity-30 transition-colors">
+              <ChevronRight className="w-3 h-3" />
             </button>
           </div>
         </div>
 
-        <div className="w-px h-5 bg-slate-200" />
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 ml-auto">
-          <TBtn onClick={handleReset} color="slate"><RotateCcw className="w-3 h-3"/>Reset</TBtn>
-          <TBtn onClick={handleDelete} color="red"><Trash2 className="w-3 h-3"/>Delete</TBtn>
-          <TBtn onClick={handleReceive} color="indigo"><Package className="w-3 h-3"/>Receive</TBtn>
-          <TBtn onClick={() => setIsLocked(!isLocked)} color={isLocked ? "amber" : "green"}>
-            {isLocked ? <Unlock className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
-            {isLocked ? "Unlock" : "Lock"}
-          </TBtn>
-          <TBtn color="slate"><Printer className="w-3 h-3"/>Print</TBtn>
-          <TBtn color="purple"><Mail className="w-3 h-3"/>Email</TBtn>
-          <div className="w-px h-5 bg-slate-200 mx-1" />
-          <TBtn onClick={() => setSelectedOrderId(null)} color="success"><Plus className="w-3 h-3"/>New</TBtn>
-          <TBtn onClick={handlePost} color="warning"><Send className="w-3 h-3"/>Post</TBtn>
-        </div>
+        <div className="flex-1" />
 
         {isLoading && (
-          <span className="text-[10px] font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-lg animate-pulse">
+          <span className="text-[10px] font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-lg animate-pulse shrink-0">
             Loading...
           </span>
         )}
       </div>
+
+      {/* ── Toolbar Row 2: Actions ── */}
+      <div className="px-4 py-1.5 border-b border-slate-200 bg-slate-50 flex gap-2 items-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <TBtn onClick={handleReset} color="slate"><RotateCcw className="w-3 h-3"/>Reset</TBtn>
+        <div className="w-px h-4 bg-slate-300" />
+        <TBtn onClick={() => setSelectedOrderId(null)} color="green"><Plus className="w-3 h-3"/>New PO</TBtn>
+        <TBtn onClick={handlePost} color="amber"><Send className="w-3 h-3"/>Post</TBtn>
+        <div className="w-px h-4 bg-slate-300" />
+        <TBtn onClick={handleDelete} color="red"><Trash2 className="w-3 h-3"/>Delete</TBtn>
+        <TBtn onClick={handleReceive} color="indigo"><Package className="w-3 h-3"/>Receive</TBtn>
+        <TBtn onClick={() => setIsLocked(!isLocked)} color={isLocked ? "amber" : "slate"}>
+          {isLocked ? <Unlock className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
+          {isLocked ? "Unlock" : "Lock"}
+        </TBtn>
+        <div className="w-px h-4 bg-slate-300" />
+        <TBtn color="slate"><Printer className="w-3 h-3"/>Print</TBtn>
+        <TBtn color="purple"><Mail className="w-3 h-3"/>Email</TBtn>
+      </div>
+
 
       {/* ── Main Content ── */}
       <div className="flex-1 overflow-hidden">
