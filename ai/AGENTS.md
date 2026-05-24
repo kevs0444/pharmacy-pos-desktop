@@ -28,7 +28,7 @@ This file gives agentic coding tools project-specific guidance for working in th
 ## AI Project Plan Summary
 - Phase 1 (Completed): High-fidelity UI for login, dashboard, inventory, orders, POS, admin, and responsive layout.
 - Phase 2 (Completed): Connect the UI to SQLite-backed data, complete cart math and checkout, refined POS terminal filtering, resolved UI alignments, and seeded varied mock product data.
-- Phase 3 (Current Focus): Finalized the dense Purchase Order UI and updated SQLite backend schema for purchase_orders (adding fields for sys_gen, terms_days, net_ucost, ext_cost, etc.). Ready to connect the Purchase Order UI to the repository layer. Following this, add role-based authorization across backend logic and IPC.
+- Phase 3 (Current Focus): Finalized the dense Purchase Order UI and updated SQLite backend schema for purchase_orders. The UI is now highly refined, featuring perfectly aligned form fields, right-aligned monetary inputs, absolute positioned workflow buttons, and a clean center pop-out Notification Center with a blurred background. Navigation logic between records has been intuitively corrected and pagination labels clarified. Additionally, backend seed and test scripts have been consolidated into a root `seeds` directory. The next priority is implementing the repository layer (`PurchaseOrderRepository.ts`) and IPC bindings for this new schema, then moving to role-based authorization.
 - Phase 4 (Next): Testing offline behavior, packaging, and client delivery via `electron-builder`.
 
 ## Roadmap Priorities For Agents
