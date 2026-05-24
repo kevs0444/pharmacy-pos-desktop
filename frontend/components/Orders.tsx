@@ -49,13 +49,16 @@ function normalizeOrderText(order: PurchaseOrderRecord): PurchaseOrderRecord {
 
 function TBtn({ children, onClick, color = "slate" }: { children: React.ReactNode; onClick?: () => void; color?: "blue"|"green"|"amber"|"red"|"indigo"|"slate"|"purple" }) {
   const cls: Record<string, string> = {
-    blue:   "bg-brand-blue hover:bg-blue-700 text-white",
-    green:  "bg-emerald-600 hover:bg-emerald-700 text-white",
-    amber:  "bg-amber-500 hover:bg-amber-600 text-white",
-    red:    "bg-red-500 hover:bg-red-600 text-white",
-    indigo: "bg-indigo-600 hover:bg-indigo-700 text-white",
-    purple: "bg-purple-600 hover:bg-purple-700 text-white",
-    slate:  "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300",
+    blue:   "bg-white border border-blue-200 text-blue-600 hover:bg-blue-50",
+    green:  "bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50",
+    amber:  "bg-white border border-amber-200 text-amber-600 hover:bg-amber-50",
+    red:    "bg-white border border-red-200 text-red-600 hover:bg-red-50",
+    indigo: "bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50",
+    purple: "bg-white border border-purple-200 text-purple-600 hover:bg-purple-50",
+    slate:  "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+    primary: "bg-brand-blue hover:bg-blue-700 text-white border border-transparent shadow-sm",
+    success: "bg-emerald-600 hover:bg-emerald-700 text-white border border-transparent shadow-sm",
+    warning: "bg-amber-500 hover:bg-amber-600 text-white border border-transparent shadow-sm",
   };
   return (
     <button
@@ -317,14 +320,14 @@ export function Orders() {
       {/* ── Header ── */}
       <PageHeader userId="CHA" dateStr={currentTime}>
         <FileText className="w-4 h-4 text-slate-400" />
-        <span className="text-xs font-bold tracking-widest uppercase text-slate-800">PO REGISTER</span>
+        <span className="text-xs font-bold tracking-widest uppercase text-white">PO REGISTER</span>
         {selectedOrder && (
           <span className="text-[10px] text-slate-400 font-medium ml-1">- {toOrderUpper(selectedOrder.manufacturerName)}</span>
         )}
       </PageHeader>
 
       {/* ── Toolbar ── */}
-      <div className="px-5 py-2.5 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 flex gap-2.5 items-center flex-wrap shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+      <div className="px-5 py-2 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 flex gap-2 items-center overflow-x-auto custom-scrollbar shadow-[0_1px_4px_rgba(0,0,0,0.06)] shrink-0">
 
         {/* Period */}
         <div className="flex items-center gap-1.5">
@@ -464,19 +467,20 @@ export function Orders() {
         <div className="w-px h-5 bg-slate-200" />
 
         {/* Action Buttons */}
-        <TBtn onClick={handleReset} color="slate"><RotateCcw className="w-3 h-3"/>Reset</TBtn>
-        <TBtn onClick={() => setSelectedOrderId(null)} color="green"><Plus className="w-3 h-3"/>New</TBtn>
-        <TBtn onClick={handlePost} color="amber"><Send className="w-3 h-3"/>Post</TBtn>
-        <TBtn onClick={handleDelete} color="red"><Trash2 className="w-3 h-3"/>Delete</TBtn>
-        <TBtn onClick={handleReceive} color="indigo"><Package className="w-3 h-3"/>Receive</TBtn>
-        <TBtn onClick={() => setIsLocked(!isLocked)} color={isLocked ? "amber" : "green"}>
-          {isLocked ? <Unlock className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
-          {isLocked ? "Unlock" : "Lock"}
-        </TBtn>
-        <TBtn color="slate"><Printer className="w-3 h-3"/>Print</TBtn>
-        <TBtn color="purple"><Mail className="w-3 h-3"/>Email</TBtn>
-
-        <div className="flex-1" />
+        <div className="flex items-center gap-1.5 ml-auto">
+          <TBtn onClick={handleReset} color="slate"><RotateCcw className="w-3 h-3"/>Reset</TBtn>
+          <TBtn onClick={handleDelete} color="red"><Trash2 className="w-3 h-3"/>Delete</TBtn>
+          <TBtn onClick={handleReceive} color="indigo"><Package className="w-3 h-3"/>Receive</TBtn>
+          <TBtn onClick={() => setIsLocked(!isLocked)} color={isLocked ? "amber" : "green"}>
+            {isLocked ? <Unlock className="w-3 h-3"/> : <Lock className="w-3 h-3"/>}
+            {isLocked ? "Unlock" : "Lock"}
+          </TBtn>
+          <TBtn color="slate"><Printer className="w-3 h-3"/>Print</TBtn>
+          <TBtn color="purple"><Mail className="w-3 h-3"/>Email</TBtn>
+          <div className="w-px h-5 bg-slate-200 mx-1" />
+          <TBtn onClick={() => setSelectedOrderId(null)} color="success"><Plus className="w-3 h-3"/>New</TBtn>
+          <TBtn onClick={handlePost} color="warning"><Send className="w-3 h-3"/>Post</TBtn>
+        </div>
 
         {isLoading && (
           <span className="text-[10px] font-bold text-brand-blue bg-blue-50 px-2 py-1 rounded-lg animate-pulse">
@@ -486,7 +490,7 @@ export function Orders() {
       </div>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden">
         <OrderDocument
           ref={docRef}
           order={selectedOrder}
@@ -497,7 +501,11 @@ export function Orders() {
           onNotify={notify}
           isLocked={isLocked}
         />
-        <div className="flex items-center justify-between px-5 py-2 border-b border-slate-100">
+      </div>
+
+      {/* ── Bottom Bar ── */}
+      <div className="border-t border-slate-200 bg-white shrink-0">
+        <div className="flex items-center justify-between px-5 py-2">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] font-bold text-slate-500">
               {selectedOrder ? `PO: ${selectedOrder.orderCode}` : "NO ORDER SELECTED"}
