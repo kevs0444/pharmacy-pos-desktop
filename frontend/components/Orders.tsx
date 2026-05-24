@@ -383,7 +383,7 @@ export function Orders() {
       </div>
 
       {/* ── Main Content ── */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden flex flex-col">
         <OrderDocument
           ref={docRef}
           order={selectedOrder}

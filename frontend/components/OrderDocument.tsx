@@ -482,8 +482,9 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
             💡 Type in the <strong>Stock Name</strong> column to search and select items from inventory.
           </p>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
           <OrderLineItemGrid
+          key={order?.id || 'new'}
           items={lineItems}
           onItemsChange={setLineItems}
           readOnly={isLocked}

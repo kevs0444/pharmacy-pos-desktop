@@ -452,7 +452,11 @@ function generateMockPurchaseOrders() {
     const priority = priorities[Math.floor(Math.random() * priorities.length)];
     const mfg = manufacturers[Math.floor(Math.random() * manufacturers.length)];
     const user = "01-MAIN";
-    const itemsCount = Math.floor(Math.random() * 5) + 1;
+    let itemsCount = 10;
+    const r = Math.random();
+    if (r < 0.05) itemsCount = 1e3;
+    else if (r < 0.2) itemsCount = Math.floor(Math.random() * 200) + 100;
+    else itemsCount = Math.floor(Math.random() * 11) + 10;
     const items = [];
     let total = 0;
     const prefixes = ["Amoxi", "Ceti", "Para", "Ibu", "Losar", "Omepra", "Salbu", "Metfor", "Amlodi", "Vitam", "Aspi"];

@@ -97,9 +97,26 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
     return filteredItems.slice(start, start + itemsPerPage);
   }, [filteredItems, gridPage, itemsPerPage]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setGridPage(1);
   }, [gridSearch]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [gridPage]);
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 10) {
+      if (gridPage < totalGridPages) {
+        setGridPage(p => p + 1);
+      }
+    }
+  }, [gridPage, totalGridPages]);
 
   // Search products when typing in stockName
   const searchProducts = useCallback(async (query: string, rowIndex: number, colIndex: number) => {
@@ -288,7 +305,11 @@ export function OrderLineItemGrid({ items, onItemsChange, readOnly = false, isLo
       </div>
 
       {/* Rows */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 bg-slate-50/20">
+      <div 
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto custom-scrollbar min-h-0 bg-slate-50/20"
+      >
         {isLoading ? (
           Array.from({ length: 15 }).map((_, rowIdx) => (
             <div key={`skel-${rowIdx}`} className="flex border-b border-slate-100 bg-white">

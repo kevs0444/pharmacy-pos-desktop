@@ -66,7 +66,11 @@ function generateMockPurchaseOrders() {
     const mfg = manufacturers[Math.floor(Math.random() * manufacturers.length)]
     const user = '01-MAIN'
     
-    const itemsCount = Math.floor(Math.random() * 5) + 1
+    let itemsCount = 10;
+    const r = Math.random();
+    if (r < 0.05) itemsCount = 1000;
+    else if (r < 0.20) itemsCount = Math.floor(Math.random() * 200) + 100;
+    else itemsCount = Math.floor(Math.random() * 11) + 10;
     const items = []
     let total = 0
     

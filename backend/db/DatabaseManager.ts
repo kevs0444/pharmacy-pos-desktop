@@ -76,7 +76,24 @@ export class DatabaseManager {
 
       if (existing) {
         continue
+        // Automatically upgrade any old mock items missing stock_nos (for scalability test)
+    try {
+      const missingStockNoCount = this.database.prepare(`SELECT count(*) as c FROM purchase_order_items WHERE stock_no IS NULL`).get() as {c: number};
+      if (missingStockNoCount && missingStockNoCount.c > 0) {
+        console.log(`[DB] Upgrading ${missingStockNoCount.c} items with missing SKUs...`);
+        const items = this.database.prepare(`SELECT id FROM purchase_order_items WHERE stock_no IS NULL`).all() as {id: number}[];
+        const update = this.database.prepare(`UPDATE purchase_order_items SET stock_no = @stockNo WHERE id = @id`);
+        this.database.transaction(() => {
+          items.forEach(item => {
+            update.run({ id: item.id, stockNo: String(Math.floor(Math.random() * 90000) + 10000) });
+          });
+        })();
+        console.log(`[DB] Successfully generated SKUs for ${items.length} items!`);
       }
+    } catch (err) {
+      console.warn('[DB] SKU upgrade skipped:', err);
+    }
+  }
 
       const applyMigration = this.database.transaction(() => {
         this.database.exec(migration.up)
