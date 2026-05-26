@@ -280,11 +280,16 @@ export function Orders() {
     const confirmed = window.confirm(`Mark order ${selectedOrder.orderCode} as "${nextStatus}"?`);
     if (!confirmed) return;
     try {
-      await window.api.orders.updateStatus(selectedOrderId, nextStatus as any);
+      if (nextStatus === "Delivered") {
+        // Use the receive endpoint — updates inventory stock atomically
+        await window.api.orders.receive(selectedOrderId);
+      } else {
+        await window.api.orders.updateStatus(selectedOrderId, nextStatus as any);
+      }
       await loadOrders();
       notify({
         variant: "success",
-        title: "Order status updated",
+        title: nextStatus === "Delivered" ? "Order received — inventory updated" : "Order status updated",
         message: `${selectedOrder.orderCode} is now ${toOrderUpper(nextStatus)}.`,
         source: "system",
       });

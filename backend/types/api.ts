@@ -249,6 +249,7 @@ export interface PharmacyApi {
     updateStatus: (orderId: number, status: OrderStatus) => Promise<void>
     save: (input: SaveOrderInput) => Promise<void>
     delete: (orderId: number) => Promise<void>
+    receive: (orderId: number) => Promise<void>
   }
   admin: {
     listUsers: (query?: AdminUserListQuery) => Promise<PaginatedResult<Omit<UserRecord, 'passwordHash'>>>

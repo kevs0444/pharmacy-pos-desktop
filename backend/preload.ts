@@ -45,6 +45,7 @@ const api: PharmacyApi = {
     updateStatus: (orderId: number, status: OrderStatus) => ipcRenderer.invoke('orders:updateStatus', { orderId, status }),
     save: (input: any) => ipcRenderer.invoke('orders:save', input),
     delete: (orderId: number) => ipcRenderer.invoke('orders:delete', orderId),
+    receive: (orderId: number) => ipcRenderer.invoke('orders:receive', orderId),
   },
   admin: {
     listUsers: (query?: AdminUserListQuery) => ipcRenderer.invoke('admin:listUsers', query),

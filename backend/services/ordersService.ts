@@ -115,4 +115,8 @@ export class OrdersService {
   delete(orderId: number): void {
     this.ordersRepository.deleteOrder(orderId)
   }
+
+  receive(orderId: number): void {
+    this.ordersRepository.receiveOrder(orderId)
+  }
 }

@@ -276,4 +276,86 @@ export class OrdersRepository {
       }
     })()
   }
+
+  receiveOrder(orderId: number): void {
+    const timestamp = new Date().toISOString()
+
+    this.db.transaction(() => {
+      // Verify order exists and is receivable
+      const order = this.db
+        .prepare('SELECT id, status, order_code FROM purchase_orders WHERE id = ?')
+        .get(orderId) as { id: number; status: string; order_code: string } | undefined
+
+      if (!order) {
+        throw new Error(`Purchase order with ID ${orderId} not found`)
+      }
+      if (order.status === 'Delivered') {
+        throw new Error(`Order ${order.order_code} is already delivered`)
+      }
+      if (order.status === 'Cancelled') {
+        throw new Error(`Cannot receive a cancelled order`)
+      }
+
+      // Get all line items that have a linked product
+      const items = this.db
+        .prepare(`
+          SELECT product_id AS productId, quantity, pkg_qty AS pkgQty, stock_name AS stockName
+          FROM purchase_order_items
+          WHERE purchase_order_id = ? AND product_id IS NOT NULL
+        `)
+        .all(orderId) as Array<{
+          productId: number
+          quantity: number
+          pkgQty: number
+          stockName: string
+        }>
+
+      for (const item of items) {
+        // Get current product state
+        const product = this.db
+          .prepare('SELECT id, total_stock_pieces, pieces_per_unit FROM products WHERE id = ? AND is_active = 1')
+          .get(item.productId) as { id: number; total_stock_pieces: number; pieces_per_unit: number } | undefined
+
+        if (!product) continue
+
+        // qty ordered is in packages: convert to pieces
+        const piecesReceived = item.quantity * (item.pkgQty || 1)
+        const newTotal = product.total_stock_pieces + piecesReceived
+
+        // Compute new status
+        let newStatus = 'In Stock'
+        if (newTotal <= 0) newStatus = 'Out of Stock'
+        else if (newTotal <= product.pieces_per_unit) newStatus = 'Low Stock'
+
+        // Update product stock
+        this.db.prepare(`
+          UPDATE products
+          SET total_stock_pieces = @total, status = @status, updated_at = @updatedAt
+          WHERE id = @id
+        `).run({ id: item.productId, total: newTotal, status: newStatus, updatedAt: timestamp })
+
+        // Record inventory movement
+        this.db.prepare(`
+          INSERT INTO inventory_movements (
+            product_id, product_batch_id, movement_type, quantity_pieces,
+            reference_type, reference_id, reason, performed_by_user_id, created_at
+          ) VALUES (
+            @productId, NULL, 'RECEIVE', @quantityPieces,
+            'PURCHASE_ORDER', @referenceId, @reason, NULL, @createdAt
+          )
+        `).run({
+          productId: item.productId,
+          quantityPieces: piecesReceived,
+          referenceId: String(orderId),
+          reason: `Received from PO #${orderId} — ${item.stockName}`,
+          createdAt: timestamp,
+        })
+      }
+
+      // Mark PO as Delivered
+      this.db.prepare(`
+        UPDATE purchase_orders SET status = 'Delivered', updated_at = @updatedAt WHERE id = @id
+      `).run({ id: orderId, updatedAt: timestamp })
+    })()
+  }
 }
