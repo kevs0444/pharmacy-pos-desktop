@@ -336,6 +336,7 @@ function AdjustmentPanel({ product, onSuccess }: { product: ProductRecord; onSuc
       const delta = adjType === "ADD" ? n : adjType === "SUBTRACT" ? -n : n;
       const newQty = adjType === "SET" ? n : product.totalStockPieces + delta;
       await window.api.inventory.update(product.id, {
+        ...product,
         totalStockPieces: newQty,
       } as any);
       setSavedMsg(`Stock updated: ${product.totalStockPieces} → ${newQty}`);
@@ -476,6 +477,7 @@ function StockmasterPanel({ product, onSuccess }: { product: ProductRecord; onSu
     setSavedMsg(null);
     try {
       await window.api.inventory.update(product.id, {
+        ...product,
         sellingPricePerPiece: parseFloat(sellPrice) || 0,
         sellingPricePerUnit: parseFloat(sellPrice) || 0,
         shelfLocation: shelfId.toUpperCase(),
