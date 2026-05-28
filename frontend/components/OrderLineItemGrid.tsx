@@ -366,32 +366,35 @@ export function OrderLineItemGrid({
         </div>
       </div>
 
-      {/* Header */}
-      <div className="flex bg-gradient-to-b from-slate-700 to-slate-800 sticky top-0 z-10">
-        {/* Row number header */}
-        <div className="w-[36px] shrink-0 flex items-center justify-center border-r border-slate-600">
-          <span className="text-[9px] font-extrabold text-slate-400">#</span>
-        </div>
-        {COLUMNS.map((col) => (
-          <div
-            key={col.key}
-            className={cn(
-              "px-1.5 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-300 border-r border-slate-600/50 last:border-r-0 shrink-0",
-              col.width,
-              col.align
-            )}
-          >
-            {col.label}
-          </div>
-        ))}
-      </div>
-
-      {/* Rows */}
+      {/* Scrollable Grid Container */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto custom-scrollbar min-h-0 bg-slate-50/20"
+        className="flex-1 overflow-auto custom-scrollbar bg-white relative"
       >
+        <div className="min-w-full w-max flex flex-col">
+          {/* Header */}
+          <div className="flex bg-gradient-to-b from-slate-100 to-slate-50 sticky top-0 z-10 border-b-2 border-slate-200 shadow-sm">
+            {/* Row number header */}
+            <div className="w-[36px] shrink-0 flex items-center justify-center border-r border-slate-200">
+              <span className="text-[10px] font-extrabold text-slate-400">#</span>
+            </div>
+            {COLUMNS.map((col) => (
+              <div
+                key={col.key}
+                className={cn(
+                  "px-2 py-2.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 border-r border-slate-200 last:border-r-0 shrink-0",
+                  col.width,
+                  col.align
+                )}
+              >
+                {col.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          <div className="flex-1 flex flex-col">
         {isLoading ? (
           Array.from({ length: 15 }).map((_, rowIdx) => (
             <div key={`skel-${rowIdx}`} className="flex border-b border-slate-100 bg-white">
@@ -413,12 +416,12 @@ export function OrderLineItemGrid({
               <div
                 key={item.rowIndex}
                 className={cn(
-                  "flex border-b border-slate-200 last:border-b-0 transition-colors duration-75",
+                  "flex border-b border-slate-100 last:border-b-0 transition-colors duration-75",
                   isSelected
-                    ? "bg-blue-50/80 ring-1 ring-inset ring-blue-300"
+                    ? "bg-blue-50/70 ring-1 ring-inset ring-blue-300"
                     : isEmpty
-                    ? "bg-slate-50/30"
-                    : "bg-white hover:bg-slate-50/50"
+                    ? "bg-white"
+                    : "even:bg-slate-50/40 hover:bg-blue-50/40 bg-white"
                 )}
                 onClick={() => setSelectedRow(item.rowIndex)}
               >
@@ -436,7 +439,7 @@ export function OrderLineItemGrid({
                     <div
                       key={col.key}
                       className={cn(
-                        "relative border-r border-slate-100 last:border-r-0 shrink-0 px-0.5 py-0.5",
+                        "relative border-r border-slate-100/80 last:border-r-0 shrink-0 px-1 py-1 flex flex-col justify-center",
                         col.width
                       )}
                     >
@@ -463,12 +466,12 @@ export function OrderLineItemGrid({
                         }}
                         onKeyDown={(e) => handleKeyDown(e, localIdx, colIdx, paginatedItems)}
                         className={cn(
-                          "w-full px-1 py-1 text-xs outline-none border-2 border-transparent focus:border-blue-500 font-bold",
+                          "w-full px-2 py-1 text-[11px] md:text-[11.5px] outline-none border border-transparent focus:border-blue-500 rounded",
                           col.align,
-                          isComputed && "text-slate-500 bg-slate-50",
-                          !isComputed && !readOnly && "hover:bg-slate-50 focus:bg-white text-slate-800",
+                          isComputed && "text-slate-500 font-semibold",
+                          !isComputed && !readOnly && "bg-transparent focus:bg-white text-slate-700 font-medium",
                           (col.key === "stockName" || col.key === "orderUnit" || col.key === "prNumber" || col.key === "remarks") && "uppercase",
-                          col.isPrice && "font-mono"
+                          col.isPrice && "font-mono font-semibold"
                         )}
                         placeholder={col.key === "stockNo" || col.key === "stockName" ? "" : undefined}
                         tabIndex={isComputed ? -1 : 0}
@@ -506,6 +509,8 @@ export function OrderLineItemGrid({
             );
           })
         )}
+          </div>
+        </div>
       </div>
 
       {/* Footer summary */}

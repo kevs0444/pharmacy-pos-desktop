@@ -16,7 +16,7 @@ interface DataGridProps {
 
 export function DataGrid({ columns, children, className }: DataGridProps) {
   return (
-    <div className={cn("flex-1 bg-white overflow-auto relative border border-slate-200/80 rounded-xl shadow-sm", className)}>
+    <div className={cn("flex-1 bg-white overflow-auto custom-scrollbar relative border border-slate-200/80 rounded-xl shadow-sm", className)}>
       <table className="w-full text-left whitespace-nowrap border-collapse text-[11px] md:text-[11.5px]">
         <thead className="sticky top-0 z-10">
           <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b-2 border-slate-200">

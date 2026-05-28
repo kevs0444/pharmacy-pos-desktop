@@ -145,7 +145,7 @@ export function Inventory() {
       <div className="flex-1 flex overflow-hidden">
 
         {/* ── LEFT: Product Grid ── */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 flex flex-col min-h-0 p-4">
           <DataGrid columns={gridColumns}>
             {isLoading ? (
               <tr>
@@ -285,7 +285,7 @@ export function Inventory() {
             </div>
 
             {/* Panel Body */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
               {!selectedProduct ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-300 px-8 text-center">
                   <ChevronLeft className="w-8 h-8" />

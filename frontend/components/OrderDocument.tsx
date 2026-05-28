@@ -278,7 +278,7 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
+    <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar overflow-x-hidden relative">
       {/* ── Document Header ── */}
       <div className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between mb-3">
@@ -525,21 +525,23 @@ export const OrderDocument = forwardRef<OrderDocumentRef, OrderDocumentProps>(({
       </div>
 
       {/* ── Line Items Grid ── */}
-      <div className="flex-1 p-4 bg-slate-50 flex flex-col min-h-[400px]">
+      <div className="flex-1 p-4 bg-slate-50 flex flex-col min-h-[450px]">
         <div className="mb-2 flex items-center justify-between shrink-0">
           <p className="text-[10px] text-slate-400 font-medium">
             💡 Type in the <strong>Stock Name</strong> column to search and select items from inventory.
           </p>
         </div>
-        <div className="flex-1 min-h-0 flex flex-col">
-          <OrderLineItemGrid
-          key={order?.id || 'new'}
-          items={lineItems}
-          onItemsChange={setLineItems}
-          readOnly={isLocked}
-          isLoading={isLoadingItems}
-          onNotify={onNotify}
-        />
+        <div className="flex-1 min-h-0 flex flex-col relative">
+          <div className="absolute inset-0 flex flex-col">
+            <OrderLineItemGrid
+              key={order?.id || 'new'}
+              items={lineItems}
+              onItemsChange={setLineItems}
+              readOnly={isLocked}
+              isLoading={isLoadingItems}
+              onNotify={onNotify}
+            />
+          </div>
         </div>
       </div>
     </div>

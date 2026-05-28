@@ -329,7 +329,7 @@ export function Orders() {
       </PageHeader>
 
       {/* ── Toolbar Row 1: Filters & Navigation ── */}
-      <div className="px-4 py-2 border-b border-slate-100 bg-white/90 backdrop-blur-md sticky top-0 z-10 flex gap-2 items-center shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+      <div className="px-4 py-2 border-b border-slate-100 bg-white/90 backdrop-blur-md sticky top-0 z-40 flex gap-2 items-center shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
 
         {/* Period Navigator */}
         <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Period</span>
@@ -478,7 +478,7 @@ export function Orders() {
 
 
       {/* ── Main Content ── */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden flex flex-col">
         <OrderDocument
           ref={docRef}
           order={selectedOrder}

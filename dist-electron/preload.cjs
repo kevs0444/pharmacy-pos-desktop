@@ -25,7 +25,8 @@ const api = {
     getItems: (orderId) => ipcRenderer.invoke("orders:getItems", orderId),
     updateStatus: (orderId, status) => ipcRenderer.invoke("orders:updateStatus", { orderId, status }),
     save: (input) => ipcRenderer.invoke("orders:save", input),
-    delete: (orderId) => ipcRenderer.invoke("orders:delete", orderId)
+    delete: (orderId) => ipcRenderer.invoke("orders:delete", orderId),
+    receive: (orderId) => ipcRenderer.invoke("orders:receive", orderId)
   },
   admin: { 
     listUsers: (q) => ipcRenderer.invoke("admin:listUsers", q), 
